@@ -19,14 +19,14 @@
 ## 🚀 Быстрый старт
 
 ```bash
-frida -U -f target.app.package -l frida-java-crypto-spy.js
+frida -U -f target.app.package -l frida-java-reverse.js
 ```
 
 ---
 
 ## ⚙️ Конфигурация
 
-В начале файла `frida-java-crypto-spy.js` находятся настройки:
+В начале файла `frida-java-reverse.js` находятся настройки:
 
 ```javascript
 const MODULES = {
