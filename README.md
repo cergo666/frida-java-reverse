@@ -95,7 +95,6 @@ const MODULES = {
 | **Activity** | Хук `Activity.startActivity` | Запуск рекламных Activity до их создания |
 | **WebView** | Хук `WebView.loadUrl` | Рекламные URL (не `file://` — локальные контроллеры SDK) |
 | **Network** | Хук `HttpURLConnection.connect` | HTTP-запросы к рекламным серверам |
-| **Internal** | Хук `com.scorp.adsservice.api.AdsService` | Внутренний广告服务 приложения |
 
 ### Поддерживаемые рекламные SDK
 

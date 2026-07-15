@@ -97,7 +97,6 @@ const MODULES = {
 | **Activity** | Hook `Activity.startActivity` | Ad Activity launch before creation |
 | **WebView** | Hook `WebView.loadUrl` | Ad URLs (not `file://` -- local SDK controllers) |
 | **Network** | Hook `HttpURLConnection.connect` | HTTP requests to ad servers |
-| **Internal** | Hook `com.scorp.adsservice.api.AdsService` | App's internal ad service |
 
 ### Supported ad SDKs
 
