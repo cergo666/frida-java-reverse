@@ -991,9 +991,6 @@ Java.perform(() => {
             InterstitialAd.loadAd.overloads.forEach(o => {
                 o.implementation = function () { logObj("AdBlocker.AdMob.Interstitial.loadAd", { blocked: true }, color); };
             });
-            InterstitialAd.show.overloads.forEach(o => {
-                o.implementation = function () { logObj("AdBlocker.AdMob.Interstitial.show", { blocked: true }, color); };
-            });
         } catch(_) {}
         try {
             const RewardedAd = Java.use("com.google.android.gms.ads.rewarded.RewardedAd");
@@ -1029,17 +1026,11 @@ Java.perform(() => {
             FbInt.loadAd.overloads.forEach(o => {
                 o.implementation = function () { logObj("AdBlocker.Facebook.Interstitial.loadAd", { blocked: true }, color); };
             });
-            FbInt.show.overloads.forEach(o => {
-                o.implementation = function () { logObj("AdBlocker.Facebook.Interstitial.show", { blocked: true }, color); };
-            });
         } catch(_) {}
         try {
             const FbRew = Java.use("com.facebook.ads.RewardedVideoAd");
             FbRew.loadAd.overloads.forEach(o => {
                 o.implementation = function () { logObj("AdBlocker.Facebook.Rewarded.loadAd", { blocked: true }, color); };
-            });
-            FbRew.show.overloads.forEach(o => {
-                o.implementation = function () { logObj("AdBlocker.Facebook.Rewarded.show", { blocked: true }, color); };
             });
         } catch(_) {}
 
@@ -1113,9 +1104,9 @@ Java.perform(() => {
 
         // --- Yandex Mobile Ads ---
         try { Java.use("com.yandex.mobile.ads.AdView").loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AdView.loadAd", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd"); YI.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Interstitial.loadAd", { blocked: true }, color); }; }); YI.show.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd"); YR.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Rewarded.loadAd", { blocked: true }, color); }; }); YR.show.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Rewarded.show", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YO = Java.use("com.yandex.mobile.ads.appopen.AppOpenAd"); YO.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AppOpen.loadAd", { blocked: true }, color); }; }); YO.show.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AppOpen.show", { blocked: true }, color); }; }); } catch(_) {}
+        try { const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd"); YI.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Interstitial.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        try { const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd"); YR.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Rewarded.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        try { const YO = Java.use("com.yandex.mobile.ads.appopen.AppOpenAd"); YO.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AppOpen.loadAd", { blocked: true }, color); }; }); } catch(_) {}
 
         // --- AppNext ---
         try { const ANI = Java.use("com.appnext.ads.interstitial.Interstitial"); ANI.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.AppNext.Interstitial.loadAd", { blocked: true }, color); }; }); ANI.showAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.AppNext.Interstitial.showAd", { blocked: true }, color); }; }); } catch(_) {}
@@ -1212,7 +1203,7 @@ Java.perform(() => {
         // Yandex Mobile Ads — InterstitialAdEventListener
         try {
             const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
-            YI.setEventListener.overloads.forEach(o => {
+            YI.setAdEventListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
                         adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "interstitial" });
@@ -1224,7 +1215,7 @@ Java.perform(() => {
         } catch(_) {}
         try {
             const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd");
-            YR.setEventListener.overloads.forEach(o => {
+            YR.setAdEventListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
                         adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "rewarded" });
@@ -1233,7 +1224,7 @@ Java.perform(() => {
                     return o.apply(this, arguments);
                 };
             });
-        } catch(_) {}
+        } catch(_){}
 
         // Google AdMob — FullScreenContentCallback / AdListener
         try {
