@@ -64,7 +64,7 @@ const MODULES = {
 | `SecretKeySpec` | Прямой перехват создания ключей |
 | `IvParameterSpec` | Перехват вектора инициализации |
 | `Tink` | Перехват Google Tink крипто-библиотеки |
-| `AdBlocker` | Блокировка рекламы и спуфинг callback'ов |
+| `AdBlocker` | Блокировка рекламы + подавление рекламного шума в крипто-логах |
 
 ### Выключены по умолчанию
 
@@ -122,7 +122,7 @@ const MODULES = {
 
 ### Фильтрация стек-трейсов
 
-`AD_KEYWORDS` — ключевые слова для фильтрации. Стек-трейс из рекламных SDK автоматически пропускается при логировании крипто-операций. Firebase Remote Config и Firebase Auth **не фильтруются** — они содержат полезные конфиги приложения.
+`AD_KEYWORDS` -- ключевые слова для фильтрации. Когда `Cipher.init` или другой крипто-метод вызывается из кода рекламного SDK (AdMob, Facebook, Unity и т.д.), стек-трейс автоматически пропускается и не засоряет вывод. Это позволяет сосредоточиться на крипто-операциях самого приложения, а не на шифровании рекламных трекеров. Firebase Remote Config и Firebase Auth **не фильтруются** -- они содержат полезные конфиги приложения.
 
 ### Утилита `hasAdKeyword`
 
@@ -132,7 +132,7 @@ const MODULES = {
 
 ## SSLUnpinner — детали
 
-Основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner) от Maurizio Siddu.
+Основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) от Maurizio Siddu.
 
 ### Методы bypass
 
