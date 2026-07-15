@@ -1433,11 +1433,6 @@ Java.perform(() => {
             console.log(`${green}[AdBlocker] Activity.startActivityForResult blocked${reset}`);
         } catch(_) {}
         console.log(`${green}[AdBlocker] Activity-level blocking + fake-callback enabled${reset}`);
-                    return o.apply(this, arguments);
-                };
-            });
-            console.log(`${green}[AdBlocker] Activity-level blocking + fake-callback enabled${reset}`);
-        } catch(_) {}
 
         // ==================== WEBVIEW BLOCKING ====================
         // Блокировка рекламных URL в WebView (file:// пропускаются — это локальные контроллеры SDK)
