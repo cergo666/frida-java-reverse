@@ -1200,25 +1200,58 @@ Java.perform(() => {
         // Некоторые приложения ждут onAdDismissed перед выполнением функционала (VPN, загрузка контента)
         const adDismissCallbacks = []; // Список активных callback-объектов
 
-        // Yandex Mobile Ads — InterstitialAdEventListener
-        try {
-            const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
-            YI.setAdEventListener.overloads.forEach(o => {
-                o.implementation = function (listener) {
-                    if (listener) {
-                        adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "interstitial" });
-                        console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener${reset}`);
-                    }
-                    return o.apply(this, arguments);
-                };
+        // Yandex Mobile Ads — динамический поиск реализации InterstitialAd
+        function hookYandexInterstitial() {
+            const ifaceName = "com.yandex.mobile.ads.interstitial.InterstitialAd";
+            const listenerIface = "com.yandex.mobile.ads.interstitial.InterstitialAdEventListener";
+            let hooked = false;
+
+            Java.enumerateLoadedClasses({
+                onMatch: function(className) {
+                    if (hooked) return;
+                    try {
+                        const cls = Java.use(className);
+                        const ifaces = cls.class.getInterfaces();
+                        for (let i = 0; i < ifaces.length; i++) {
+                            if (ifaces[i].getName() === ifaceName) {
+                                // Нашли реализацию InterstitialAd
+                                cls.setAdEventListener.overloads.forEach(o => {
+                                    o.implementation = function (listener) {
+                                        if (listener) {
+                                            adDismissCallbacks.push({ sdk: "Yandex", listener: Java.retain(listener), type: "interstitial" });
+                                            console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener (${className})${reset}`);
+                                        }
+                                        return o.apply(this, arguments);
+                                    };
+                                });
+                                cls.show.overloads.forEach(o => {
+                                    o.implementation = function (activity) {
+                                        logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color);
+                                        fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
+                                        return;
+                                    };
+                                });
+                                console.log(`${green}[AdBlocker] Yandex InterstitialAd hooked on ${className}${reset}`);
+                                hooked = true;
+                                return;
+                            }
+                        }
+                    } catch(_) {}
+                },
+                onComplete: function() {
+                    if (!hooked) console.log(`${yellow}[AdBlocker] Yandex InterstitialAd class not found (SDK not present)${reset}`);
+                }
             });
-        } catch(_) {}
+        }
+        try { hookYandexInterstitial(); } catch(e) { console.log(`${red}[AdBlocker] Yandex hook error: ${e}${reset}`); }
+
+        // Yandex Mobile Ads — RewardedAd
         try {
             const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd");
             YR.setAdEventListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "rewarded" });
+                        adDismissCallbacks.push({ sdk: "Yandex", listener: Java.retain(listener), type: "rewarded" });
                         console.log(`${yellow}[AdBlocker] Captured Yandex RewardedAdEventListener${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1226,14 +1259,14 @@ Java.perform(() => {
             });
         } catch(_){}
 
-        // IronSource / LevelPlay — InterstitialListener / LevelPlayInterstitialListener
+        // IronSource / LevelPlay — LevelPlayInterstitialListener / LevelPlayRewardedVideoListener
         try {
             const IS = Java.use("com.ironsource.mediationsdk.IronSource");
-            IS.setInterstitialListener.overloads.forEach(o => {
+            IS.setLevelPlayInterstitialListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "IronSource", listener: listener, type: "interstitial" });
-                        console.log(`${yellow}[AdBlocker] Captured IronSource InterstitialListener${reset}`);
+                        adDismissCallbacks.push({ sdk: "IronSource", listener: Java.retain(listener), type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured IronSource LevelPlayInterstitialListener${reset}`);
                     }
                     return o.apply(this, arguments);
                 };
@@ -1241,11 +1274,11 @@ Java.perform(() => {
         } catch(_) {}
         try {
             const IS = Java.use("com.ironsource.mediationsdk.IronSource");
-            IS.setRewardedVideoListener.overloads.forEach(o => {
+            IS.setLevelPlayRewardedVideoListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "IronSource", listener: listener, type: "rewarded" });
-                        console.log(`${yellow}[AdBlocker] Captured IronSource RewardedVideoListener${reset}`);
+                        adDismissCallbacks.push({ sdk: "IronSource", listener: Java.retain(listener), type: "rewarded" });
+                        console.log(`${yellow}[AdBlocker] Captured IronSource LevelPlayRewardedVideoListener${reset}`);
                     }
                     return o.apply(this, arguments);
                 };
@@ -1258,7 +1291,7 @@ Java.perform(() => {
             GA.setFullScreenContentCallback.overloads.forEach(o => {
                 o.implementation = function (callback) {
                     if (callback) {
-                        adDismissCallbacks.push({ sdk: "Google", listener: callback, type: "interstitial" });
+                        adDismissCallbacks.push({ sdk: "Google", listener: Java.retain(callback), type: "interstitial" });
                         console.log(`${yellow}[AdBlocker] Captured Google FullScreenContentCallback${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1270,7 +1303,7 @@ Java.perform(() => {
             GR.setFullScreenContentCallback.overloads.forEach(o => {
                 o.implementation = function (callback) {
                     if (callback) {
-                        adDismissCallbacks.push({ sdk: "Google", listener: callback, type: "rewarded" });
+                        adDismissCallbacks.push({ sdk: "Google", listener: Java.retain(callback), type: "rewarded" });
                         console.log(`${yellow}[AdBlocker] Captured Google Rewarded FullScreenContentCallback${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1282,7 +1315,7 @@ Java.perform(() => {
             GAV.setAdListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "Google", listener: listener, type: "banner" });
+                        adDismissCallbacks.push({ sdk: "Google", listener: Java.retain(listener), type: "banner" });
                         console.log(`${yellow}[AdBlocker] Captured Google AdListener${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1296,7 +1329,7 @@ Java.perform(() => {
             FBA.setAdListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "Facebook", listener: listener, type: "interstitial" });
+                        adDismissCallbacks.push({ sdk: "Facebook", listener: Java.retain(listener), type: "interstitial" });
                         console.log(`${yellow}[AdBlocker] Captured Facebook InterstitialAdListener${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1308,7 +1341,7 @@ Java.perform(() => {
             FBR.setAdListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
-                        adDismissCallbacks.push({ sdk: "Facebook", listener: listener, type: "rewarded" });
+                        adDismissCallbacks.push({ sdk: "Facebook", listener: Java.retain(listener), type: "rewarded" });
                         console.log(`${yellow}[AdBlocker] Captured Facebook RewardedAdListener${reset}`);
                     }
                     return o.apply(this, arguments);
@@ -1337,27 +1370,24 @@ Java.perform(() => {
                             fired++;
                         }
                     } else if (cb.sdk === "Facebook") {
-                        if (cb.listener.onLoggingImpression) {
-                            // Facebook uses onInterstitialDismissed or onAdClicked
-                            if (cb.listener.onInterstitialDismissed) {
-                                cb.listener.onInterstitialDismissed();
-                                fired++;
-                            } else if (cb.listener.onAdDismissed) {
-                                cb.listener.onAdDismissed();
-                                fired++;
-                            }
+                        if (cb.listener.onInterstitialDismissed) {
+                            cb.listener.onInterstitialDismissed();
+                            fired++;
+                        } else if (cb.listener.onAdDismissed) {
+                            cb.listener.onAdDismissed();
+                            fired++;
                         }
                     } else if (cb.sdk === "IronSource") {
-                        if (cb.listener.onInterstitialAdClosed) {
-                            cb.listener.onInterstitialAdClosed();
+                        if (cb.listener.onAdClosed) {
+                            cb.listener.onAdClosed(null);
                             fired++;
-                        } else if (cb.listener.onRewardedVideoAdClosed) {
-                            cb.listener.onRewardedVideoAdClosed();
+                        } else if (cb.listener.onInterstitialAdClosed) {
+                            cb.listener.onInterstitialAdClosed();
                             fired++;
                         }
                     }
                 } catch(e) {
-                    console.log(`${red}[AdBlocker] Callback fire error (${cb.sdk}): ${e}${reset}`);
+                    console.log(`${red}[AdBlocker] Callback error (${cb.sdk}): ${e}${reset}`);
                 }
             }
             return fired;
@@ -1369,12 +1399,11 @@ Java.perform(() => {
                     try {
                         const comp = intent.getComponent();
                         if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                            const activityName = comp.getClassName();
-                            const fired = fireAdDismissCallbacks(activityName);
+                            const fired = fireAdDismissCallbacks(comp.getClassName());
                             if (fired > 0) {
-                                console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed fired (${fired} callbacks)${reset}`);
+                                console.log(`${green}[AdBlocker.ActivityBlocked] ${comp.getClassName()} → fake onAdDismissed (${fired})${reset}`);
                             } else {
-                                logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
+                                logObj("AdBlocker.ActivityBlocked", { activity: comp.getClassName() }, color);
                             }
                             return;
                         }
