@@ -56,6 +56,12 @@ const MODULES = {
 
 ---
 
+## PRINT_STACKTRACE
+
+Global toggle at the top of the file. When `true`, each intercepted call includes a backtrace showing the call depth and path — from the Java method back to the app's entry point. When `false`, only call data (key, IV, payload) is printed without the stack.
+
+---
+
 ## Modules
 
 ### Enabled by default
@@ -156,12 +162,6 @@ Shared function for checking strings against keyword lists. Used for filtering s
 | React Native | RNCWebViewClient onReceivedSslError + onReceivedError |
 | Cordova | WebViewClient onReceivedSslError |
 | Dynamic Patcher | Auto-patch SSLPeerUnverifiedException for unknown methods |
-
----
-
-## PRINT_STACKTRACE
-
-Global toggle at the top of the file. When `true`, each intercepted call includes a backtrace showing the call depth and path — from the Java method back to the app's entry point. When `false`, only call data (key, IV, payload) is printed without the stack.
 
 ---
 

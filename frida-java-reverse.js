@@ -1,7 +1,7 @@
 Java.perform(() => {
     // ===================== CONFIGURATION =====================
 
-    const PRINT_STACKTRACE = true;
+    const PRINT_STACKTRACE = true;  // true — добавлять backtrace к каждому вызову
 
     const MODULES = {
         Cipher: true,               // javax.crypto.Cipher — отслеживание шифрования/дешифрования

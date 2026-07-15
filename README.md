@@ -56,6 +56,12 @@ const MODULES = {
 
 ---
 
+## PRINT_STACKTRACE
+
+Глобальный переключатель в начале файла. При `true` к каждому перехваченному вызову добавляется стек-трейс (backtrace) с указанием глубины и пути вызова — от Java-метода до точки входа в приложение. При `false` выводятся только данные вызова (ключ, IV, данные) без стека.
+
+---
+
 ## Модули
 
 ### Включены по умолчанию
@@ -156,12 +162,6 @@ const MODULES = {
 | React Native | RNCWebViewClient onReceivedSslError + onReceivedError |
 | Cordova | WebViewClient onReceivedSslError |
 | Dynamic Patcher | Автопатч SSLPeerUnverifiedException для неизвестных методов |
-
----
-
-## PRINT_STACKTRACE
-
-Глобальный переключатель в начале файла. При `true` к каждому перехваченному вызову добавляется стек-трейс (backtrace) с указанием глубины и пути вызова — от Java-метода до точки входа в приложение. При `false` выводятся только данные вызова (ключ, IV, данные) без стека.
 
 ---
 
