@@ -14,7 +14,7 @@ Based on the original **frida-java-crypto-spy** project:
 
 The original script provided basic `javax.crypto.Cipher` interception with key, IV, and data logging.
 
-SSL Unpinner based on [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) by Maurizio Siddu.
+SSL Unpinner based on https://codeshare.frida.re/@akabe1/frida-multiple-unpinning/ by Maurizio Siddu.
 
 ---
 
@@ -130,10 +130,6 @@ const MODULES = {
 Shared function for checking strings against keyword lists. Used for filtering stack traces, URLs, and Activity names.
 
 ---
-
-## SSLUnpinner -- details
-
-Based on [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) by Maurizio Siddu.
 
 ### Bypass methods
 
