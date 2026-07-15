@@ -1317,14 +1317,19 @@ Java.perform(() => {
                 const cb = adDismissCallbacks[i];
                 try {
                     if (cb.sdk === "Yandex") {
+                        if (cb.listener.onAdShown) {
+                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdShown${reset}`);
+                            cb.listener.onAdShown();
+                        }
                         if (cb.listener.onAdDismissed) {
-                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdDismissed on ${cb.listener.getClass().getName()}${reset}`);
+                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdDismissed${reset}`);
                             cb.listener.onAdDismissed();
                             fired++;
-                        } else {
-                            console.log(`${yellow}[AdBlocker] Yandex listener has no onAdDismissed method${reset}`);
                         }
                     } else if (cb.sdk === "Google") {
+                        if (cb.listener.onAdShowedFullScreenContent) {
+                            cb.listener.onAdShowedFullScreenContent();
+                        }
                         if (cb.listener.onAdDismissedFullScreenContent) { cb.listener.onAdDismissedFullScreenContent(); fired++; }
                         else if (cb.listener.onAdClosed) { cb.listener.onAdClosed(); fired++; }
                     } else if (cb.sdk === "Facebook") {
@@ -1356,7 +1361,7 @@ Java.perform(() => {
                         } else {
                             logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
                         }
-                    }, 50);
+                    }, 100);
                     return true;
                 }
             } catch(_) {}
