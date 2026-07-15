@@ -14,7 +14,7 @@
 
 Оригинальный скрипт предоставлял базовый перехват `javax.crypto.Cipher` с логированием ключей, IV и данных.
 
-SSL Unpinner основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) от Maurizio Siddu.
+SSL Unpinner основан на https://codeshare.frida.re/@akabe1/frida-multiple-unpinning/ от Maurizio Siddu.
 
 ---
 
@@ -130,10 +130,6 @@ const MODULES = {
 Общая функция для проверки строк по списку ключевых слов. Используется для фильтрации стек-трейсов, URL и имён Activity.
 
 ---
-
-## SSLUnpinner — детали
-
-Основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) от Maurizio Siddu.
 
 ### Методы bypass
 
