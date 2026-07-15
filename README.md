@@ -1,10 +1,10 @@
-# 🔍 frida-java-reverse
+# frida-java-reverse
 
 Мощный [Frida](https://frida.re) скрипт для реверс-инжиниринга Android-приложений. Перехватывает крипто-операции, анализирует безопасность и блокирует рекламу.
 
 ---
 
-## 🙏 Благодарности
+## Благодарности
 
 Этот скрипт основан на оригинальном проекте **frida-java-crypto-spy**:
 
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Быстрый старт
+## Быстрый старт
 
 ```bash
 frida -U -f target.app.package -l frida-java-reverse.js
@@ -24,38 +24,37 @@ frida -U -f target.app.package -l frida-java-reverse.js
 
 ---
 
-## ⚙️ Конфигурация
+## Конфигурация
 
 В начале файла `frida-java-reverse.js` находятся настройки:
 
 ```javascript
-const MODULES = {
-    Cipher: true,
-    SecretKeySpec: true,
-    IvParameterSpec: true,
-    KeyGenerator: false,
-    KeyPairGenerator: false,
-    MessageDigest: false,
-    SecretKeyFactory: false,
-    Signature: false,
-    Mac: false,
-    KeyGenParameterSpec: false,
-    KeyStore: true,
-    SSLContext: false,
-    OkHttp: false,
-    EncryptedSharedPrefs: false,
-    SQLCipher: false,
-    Tink: true,
-    AdBlocker: false
-};
-
-const IGNORE_KEYWORDS = [ /* ... */ ];
 const PRINT_STACKTRACE = true;
+
+const MODULES = {
+    Cipher: true,               // javax.crypto.Cipher
+    SecretKeySpec: true,        // javax.crypto.spec.SecretKeySpec
+    IvParameterSpec: true,      // javax.crypto.spec.IvParameterSpec
+    KeyGenerator: false,        // javax.crypto.KeyGenerator
+    KeyPairGenerator: false,    // java.security.KeyPairGenerator
+    MessageDigest: false,       // java.security.MessageDigest
+    SecretKeyFactory: false,    // javax.crypto.SecretKeyFactory
+    Signature: false,           // java.security.Signature
+    Mac: false,                 // javax.crypto.Mac
+    KeyGenParameterSpec: false, // android.security.keystore
+    KeyStore: false,            // java.security.KeyStore
+    SSLContext: false,          // javax.net.ssl.SSLContext
+    OkHttp: false,              // okhttp3
+    EncryptedSharedPrefs: false,// androidx.security.crypto
+    SQLCipher: false,           // net.sqlcipher
+    Tink: true,                 // com.google.crypto.tink
+    AdBlocker: true             // Блокировка всей рекламы
+};
 ```
 
 ---
 
-## 📦 Модули
+## Модули
 
 ### Включены по умолчанию
 
@@ -64,10 +63,10 @@ const PRINT_STACKTRACE = true;
 | `Cipher` | Перехват шифрования/дешифрования (AES, DES, RSA и др.) |
 | `SecretKeySpec` | Прямой перехват создания ключей |
 | `IvParameterSpec` | Перехват вектора инициализации |
-| `KeyStore` | Анализ хранилища ключей Android Keystore |
 | `Tink` | Перехват Google Tink крипто-библиотеки |
+| `AdBlocker` | Блокировка рекламы и спуфинг callback'ов |
 
-### Выключены по умолчанию (включаются при необходимости)
+### Выключены по умолчанию
 
 | Модуль | Описание |
 |--------|----------|
@@ -78,32 +77,66 @@ const PRINT_STACKTRACE = true;
 | `Signature` | Цифровые подписи |
 | `Mac` | HMAC операции |
 | `KeyGenParameterSpec` | Параметры генерации ключей Keystore |
+| `KeyStore` | Анализ хранилища ключей Android Keystore |
 | `SSLContext` | Анализ SSL/TLS конфигурации |
 | `OkHttp` | Обнаружение пиннинга сертификатов |
 | `EncryptedSharedPrefs` | Перехват зашифрованных SharedPreferences |
 | `SQLCipher` | Анализ зашифрованных баз данных |
-| `AdBlocker` | Блокировка рекламы и спуфинг callback'ов |
 
 ---
 
-## 🛡️ Возможности оригинального скрипта
+## AdBlocker — детали
 
-Оригальный [frida-java-crypto-spy](https://github.com/QM4RS/frida-java-crypto-spy) предоставлял:
+### Уровни блокировки
 
-- Перехват `Cipher.init`, `update`, `doFinal`
-- Логирование алгоритма, режима, ключа и IV
-- Поддержку AES/CBC, AES/GCM и других режимов
-- Базовый вывод в Base64/UTF-8
+| Уровень | Механизм | Что блокирует |
+|---------|----------|---------------|
+| **SDK** | Хук `loadAd`/`show` на каждом рекламном SDK | Загрузку и показ рекламы |
+| **Activity** | Хук `Activity.startActivity` | Запуск рекламных Activity до их создания |
+| **WebView** | Хук `WebView.loadUrl` | Рекламные URL (не `file://` — локальные контроллеры SDK) |
+| **Network** | Хук `HttpURLConnection.connect` | HTTP-запросы к рекламным серверам |
+| **Internal** | Хук `com.scorp.adsservice.api.AdsService` | Внутренний广告服务 приложения |
+
+### Поддерживаемые рекламные SDK
+
+| SDK | Блокировка |
+|-----|-----------|
+| Google AdMob | AdView, InterstitialAd, RewardedAd, AdListener |
+| Facebook Audience Network | AdView, InterstitialAd, RewardedVideoAd |
+| Unity Ads | load, show |
+| IronSource / LevelPlay | Interstitial, RewardedVideo, Banner |
+| AppLovin MAX | MaxInterstitialAd, MaxRewardedAd, MaxAdView, MaxAppOpenAd |
+| Vungle | loadAd, playAd |
+| Chartboost | Interstitial, RewardedVideo (load, cache, show) |
+| Pangle (TikTok) | Interstitial, RewardVideo, Splash |
+| StartApp | showAd, Ad.load |
+| Yandex Mobile Ads | AdView, InterstitialAd, RewardedAd, AppOpenAd |
+| AppNext | Interstitial, Banner, Fullscreen |
+| Tapjoy | connect, Offerwall, DirectAction |
+| Mintegral (mbridge) | Rewarded, Interstitial, Banner, Splash + legacy |
+| Fyber (Digital Turbine) | init, requestAd, Video |
+| MyTarget (Mail.ru) | Interstitial, Rewarded, Banner, Native |
+| Bigo Ads | Interstitial, Rewarded, Banner, Native, Splash |
+| Maticoo | Interstitial, Video, Splash, Banner |
+| InMobi | Interstitial, Banner, Native, Rewarded |
+
+### Фильтрация стек-трейсов
+
+`AD_KEYWORDS` — ключевые слова для фильтрации. Стек-трейс из рекламных SDK автоматически пропускается при логировании крипто-операций. Firebase Remote Config и Firebase Auth **не фильтруются** — они содержат полезные конфиги приложения.
+
+### Утилита `hasAdKeyword`
+
+Общая функция для проверки строк по списку ключевых слов. Используется для фильтрации стек-трейсов, URL и имён Activity.
 
 ---
 
-## 🔧 Что добавлено в新 версии
+## Что добавлено
 
 ### Крипто-модули
 
-- **SecretKeySpec** — прямой перехват создания ключей (не только через Cipher.init)
+- **SecretKeySpec** — прямой перехват создания ключей
 - **IvParameterSpec** — прямой перехват IV
-- **KeyStore** — анализ `getEntry`, `getKey`, `setEntry`, `load` в Android Keystore
+- **KeyStore** — анализ `getEntry`, `getKey`, `setEntry`, `load`
 - **MessageDigest** — хеширование (SHA-256, MD5)
 - **Mac** — HMAC операции
 - **Signature** — цифровые подписи
@@ -124,16 +157,16 @@ const PRINT_STACKTRACE = true;
 
 ### Удобство
 
-- **AdBlocker** — блокировка рекламы (AdMob, Facebook, Unity, IronSource и др.)
+- **AdBlocker** — блокировка рекламы с 5 уровнями защиты
 - **PRINT_STACKTRACE** — переключатель вывода стека вызовов
-- **IGNORE_KEYWORDS** — фильтрация рекламных/аналитических SDK
+- **AD_KEYWORDS** — фильтрация рекламных/аналитических SDK
 - **Счётчик вызовов (#N)** — показывает сколько раз вызван каждый метод
 - **HEX вывод** — автоматическое отображение HEX для ключей 16/20/24/32 байта
 - **Модульность** — включение/выключение отдельных модулей
 
 ---
 
-## 📄 Пример вывода
+## Пример вывода
 
 ### Шифрование AES/CBC
 
@@ -159,12 +192,12 @@ const PRINT_STACKTRACE = true;
   key: oHeY9IH3/QHKXVu3BCTbWQ==
   iv: +koINuprs1G9C4ir
   tagLength: 128
-📚 Backtrace (depth: 19) ↓↓↓
+Backtrace (depth: 19)
 1. com.android.internal.os.ZygoteInit.main(ZygoteInit.java:861)
   2. ...
     16. com.example.app.MainActivity.onCreate(MainActivity.kt:20)
       17. javax.crypto.Cipher.init(Cipher.java:-2)
-📚 [End of Backtrace]
+[End of Backtrace]
 ```
 
 ### KeyStore анализ
@@ -183,31 +216,13 @@ const PRINT_STACKTRACE = true;
 
 ---
 
-## 📋 Список фильтрации рекламы
-
-Игнорируются при анализе стека вызовов:
-
-- Google AdMob, Analytics
-- Facebook Ads
-- Yandex AppMetrica, Ads
-- Unity Ads
-- IronSource, AppLovin, Vungle
-- Chartboost, Mbridge, InMobi
-- Pangle (TikTok)
-- Firebase Analytics, Messaging, Crashlytics
-- AppsFlyer, Adjust, Branch
-- Amplitude, Mixpanel, Segment
-- и другие рекламные/аналитические SDK
-
----
-
-## 📝 Лицензия
+## Лицензия
 
 MIT License
 
 ---
 
-## 👤 Автор
+## Автор
 
 **Mehdi Karzari** (оригинальный скрипт)
 - GitHub: [https://github.com/QM4RS](https://github.com/QM4RS)
