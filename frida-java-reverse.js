@@ -16,7 +16,6 @@ Java.perform(() => {
         KeyGenParameterSpec: false, // android.security.keystore — параметры генерации ключей в KeyStore
         KeyStore: false,            // java.security.KeyStore — хранилище ключей и сертификатов
         SSLContext: false,          // javax.net.ssl.SSLContext — настройка SSL/TLS
-        OkHttp: false,              // okhttp3 — пинning сертификатов и создание клиентов
         SSLUnpinner: true,          // Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.)
         EncryptedSharedPrefs: false,// androidx.security.crypto — зашифрованные SharedPreferences
         SQLCipher: false,           // net.sqlcipher — зашифрованные SQLite базы данных
@@ -664,30 +663,6 @@ Java.perform(() => {
         } catch(_) {}
     }
 
-    // --- OkHttp: отслеживание пиннинга сертификатов ---
-    if (MODULES.OkHttp) {
-        const color = nextColor();
-        try {
-            Java.use("okhttp3.CertificatePinner").check.overloads.forEach(o => {
-                o.implementation = function () {
-                    const analysis = analyzeStack();
-                    if (analysis.ignored) return o.apply(this, arguments);
-                    logObj("CertificatePinner.check", { hostname: arguments[0], peerCertificates: arguments[1] ? arguments[1].size() : null }, color);
-                    if (PRINT_STACKTRACE) printBacktrace(analysis.stack);
-                    return o.apply(this, arguments);
-                };
-            });
-        } catch(_) {}
-        try {
-            Java.use("okhttp3.OkHttpClient").newBuilder.overloads.forEach(o => {
-                o.implementation = function () {
-                    logObj("OkHttp.newBuilder", {}, color);
-                    return o.apply(this, arguments);
-                };
-            });
-        } catch(_) {}
-    }
-
     // ===================== SSL UNPINNER =====================
 
     if (MODULES.SSLUnpinner) {
@@ -711,7 +686,6 @@ Java.perform(() => {
                 "[Ljavax.net.ssl.KeyManager;", "[Ljavax.net.ssl.TrustManager;", "java.security.SecureRandom"
             );
             SSLContext_init.implementation = function(keyManager, trustManager, secureRandom) {
-                logObj("SSLUnpinner.TrustManager", { bypassed: true }, color);
                 SSLContext_init.call(this, keyManager, TrustManagers, secureRandom);
             };
         } catch(_) {}
@@ -719,237 +693,178 @@ Java.perform(() => {
         // --- TrustManagerImpl (Android > 7): обход проверки цепочки сертификатов ---
         try {
             const ArrayList = Java.use("java.util.ArrayList");
-            Java.use("com.android.org.conscrypt.TrustManagerImpl").checkTrustedRecursive.implementation = function(certs, ocspData, tlsSctData, host, clientAuth, untrustedChain, trustAnchorChain, used) {
-                logObj("SSLUnpinner.TrustManagerImpl.checkTrustedRecursive", { host: host }, color);
+            Java.use("com.android.org.conscrypt.TrustManagerImpl").checkTrustedRecursive.implementation = function() {
                 return ArrayList.$new();
             };
         } catch(_) {}
         try {
-            Java.use("com.android.org.conscrypt.TrustManagerImpl").verifyChain.implementation = function(untrustedChain, trustAnchorChain, host, clientAuth, ocspData, tlsSctData) {
-                logObj("SSLUnpinner.TrustManagerImpl.verifyChain", { host: host }, color);
+            Java.use("com.android.org.conscrypt.TrustManagerImpl").verifyChain.implementation = function(untrustedChain) {
                 return untrustedChain;
             };
         } catch(_) {}
 
         // --- OkHttp v3 (4 варианта) ---
         try {
-            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "java.util.List").implementation = function(a, b) {
-                logObj("SSLUnpinner.OkHttp3.check{1}", { host: a }, color);
-            };
+            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "java.util.List").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "java.security.cert.Certificate").implementation = function(a, b) {
-                logObj("SSLUnpinner.OkHttp3.check{2}", { host: a }, color);
-            };
+            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "java.security.cert.Certificate").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "[Ljava.security.cert.Certificate;").implementation = function(a, b) {
-                logObj("SSLUnpinner.OkHttp3.check{3}", { host: a }, color);
-            };
+            Java.use("okhttp3.CertificatePinner").check.overload("java.lang.String", "[Ljava.security.cert.Certificate;").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("okhttp3.CertificatePinner").check$okhttp.overload("java.lang.String", "kotlin.jvm.functions.Function0").implementation = function(a, b) {
-                logObj("SSLUnpinner.OkHttp3.check$okhttp{4}", { host: a }, color);
-            };
+            Java.use("okhttp3.CertificatePinner").check$okhttp.overload("java.lang.String", "kotlin.jvm.functions.Function0").implementation = function() {};
         } catch(_) {}
 
         // --- Squareup CertificatePinner (OkHttp < v3, 2 варианта) ---
         try {
-            Java.use("com.squareup.okhttp.CertificatePinner").check.overload("java.lang.String", "java.security.cert.Certificate").implementation = function(a, b) {
-                logObj("SSLUnpinner.Squareup.check{1}", { host: a }, color);
-            };
+            Java.use("com.squareup.okhttp.CertificatePinner").check.overload("java.lang.String", "java.security.cert.Certificate").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.squareup.okhttp.CertificatePinner").check.overload("java.lang.String", "java.util.List").implementation = function(a, b) {
-                logObj("SSLUnpinner.Squareup.check{2}", { host: a }, color);
-            };
+            Java.use("com.squareup.okhttp.CertificatePinner").check.overload("java.lang.String", "java.util.List").implementation = function() {};
         } catch(_) {}
 
         // --- Squareup OkHostnameVerifier (2 варианта) ---
         try {
-            Java.use("com.squareup.okhttp.internal.tls.OkHostnameVerifier").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function(a, b) {
-                logObj("SSLUnpinner.Squareup.HostnameVerifier{1}", { host: a }, color);
-                return true;
-            };
+            Java.use("com.squareup.okhttp.internal.tls.OkHostnameVerifier").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function() { return true; };
         } catch(_) {}
         try {
-            Java.use("com.squareup.okhttp.internal.tls.OkHostnameVerifier").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function(a, b) {
-                logObj("SSLUnpinner.Squareup.HostnameVerifier{2}", { host: a }, color);
-                return true;
-            };
+            Java.use("com.squareup.okhttp.internal.tls.OkHostnameVerifier").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function() { return true; };
         } catch(_) {}
 
         // --- Trustkit (3 варианта) ---
         try {
-            Java.use("com.datatheorem.android.trustkit.pinning.OkHostnameVerifier").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function(a, b) {
-                logObj("SSLUnpinner.Trustkit.verify{1}", { host: a }, color);
-                return true;
-            };
+            Java.use("com.datatheorem.android.trustkit.pinning.OkHostnameVerifier").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function() { return true; };
         } catch(_) {}
         try {
-            Java.use("com.datatheorem.android.trustkit.pinning.OkHostnameVerifier").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function(a, b) {
-                logObj("SSLUnpinner.Trustkit.verify{2}", { host: a }, color);
-                return true;
-            };
+            Java.use("com.datatheorem.android.trustkit.pinning.OkHostnameVerifier").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function() { return true; };
         } catch(_) {}
         try {
-            Java.use("com.datatheorem.android.trustkit.pinning.PinningTrustManager").checkServerTrusted.overload("[Ljava.security.cert.X509Certificate;", "java.lang.String").implementation = function(chain, authType) {};
+            Java.use("com.datatheorem.android.trustkit.pinning.PinningTrustManager").checkServerTrusted.overload("[Ljava.security.cert.X509Certificate;", "java.lang.String").implementation = function() {};
         } catch(_) {}
 
         // --- OpenSSLSocketImpl Conscrypt (2 варианта) ---
         try {
-            Java.use("com.android.org.conscrypt.OpenSSLSocketImpl").verifyCertificateChain.implementation = function(certRefs, JavaObject, authMethod) {};
+            Java.use("com.android.org.conscrypt.OpenSSLSocketImpl").verifyCertificateChain.overload("[Ljava.lang.Object;", "java.lang.Object", "java.lang.Object").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.android.org.conscrypt.OpenSSLSocketImpl").verifyCertificateChain.implementation = function(certChain, authMethod) {};
+            Java.use("com.android.org.conscrypt.OpenSSLSocketImpl").verifyCertificateChain.overload("[Ljava.lang.Object;", "java.lang.Object").implementation = function() {};
         } catch(_) {}
 
         // --- OpenSSLEngineSocketImpl Conscrypt ---
         try {
-            Java.use("com.android.org.conscrypt.OpenSSLEngineSocketImpl").verifyCertificateChain.overload("[Ljava.lang.Long;", "java.lang.String").implementation = function(a, b) {};
+            Java.use("com.android.org.conscrypt.OpenSSLEngineSocketImpl").verifyCertificateChain.overload("[Ljava.lang.Long;", "java.lang.String").implementation = function() {};
         } catch(_) {}
 
         // --- OpenSSLSocketImpl Apache Harmony ---
         try {
-            Java.use("org.apache.harmony.xnet.provider.jsse.OpenSSLSocketImpl").verifyCertificateChain.implementation = function(chain, authMethod) {};
+            Java.use("org.apache.harmony.xnet.provider.jsse.OpenSSLSocketImpl").verifyCertificateChain.implementation = function() {};
         } catch(_) {}
 
         // --- Conscrypt CertPinManager (2 варианта) ---
         try {
-            Java.use("com.android.org.conscrypt.CertPinManager").checkChainPinning.overload("java.lang.String", "java.util.List").implementation = function(a, b) {
-                logObj("SSLUnpinner.CertPinManager.checkChainPinning", { host: a }, color);
-                return true;
-            };
+            Java.use("com.android.org.conscrypt.CertPinManager").checkChainPinning.overload("java.lang.String", "java.util.List").implementation = function() { return true; };
         } catch(_) {}
         try {
-            Java.use("com.android.org.conscrypt.CertPinManager").isChainValid.overload("java.lang.String", "java.util.List").implementation = function(a, b) {
-                logObj("SSLUnpinner.CertPinManager.isChainValid", { host: a }, color);
-                return true;
-            };
+            Java.use("com.android.org.conscrypt.CertPinManager").isChainValid.overload("java.lang.String", "java.util.List").implementation = function() { return true; };
         } catch(_) {}
 
         // --- CWAC-Netsecurity CertPinManager ---
         try {
-            Java.use("com.commonsware.cwac.netsecurity.conscrypt.CertPinManager").isChainValid.overload("java.lang.String", "java.util.List").implementation = function(a, b) {
-                logObj("SSLUnpinner.CWAC.CertPinManager", { host: a }, color);
-                return true;
-            };
+            Java.use("com.commonsware.cwac.netsecurity.conscrypt.CertPinManager").isChainValid.overload("java.lang.String", "java.util.List").implementation = function() { return true; };
         } catch(_) {}
 
         // --- Appcelerator Titanium ---
         try {
-            Java.use("appcelerator.https.PinningTrustManager").checkServerTrusted.implementation = function(chain, authType) {};
+            Java.use("appcelerator.https.PinningTrustManager").checkServerTrusted.implementation = function() {};
         } catch(_) {}
 
         // --- Fabric ---
         try {
-            Java.use("io.fabric.sdk.android.services.network.PinningTrustManager").checkServerTrusted.implementation = function(chain, authType) {};
+            Java.use("io.fabric.sdk.android.services.network.PinningTrustManager").checkServerTrusted.implementation = function() {};
         } catch(_) {}
 
         // --- PhoneGap ---
         try {
-            Java.use("nl.xservices.plugins.sslCertificateChecker").execute.overload("java.lang.String", "org.json.JSONArray", "org.apache.cordova.CallbackContext").implementation = function(a, b, c) {
-                logObj("SSLUnpinner.PhoneGap", { action: a }, color);
-                return true;
-            };
+            Java.use("nl.xservices.plugins.sslCertificateChecker").execute.overload("java.lang.String", "org.json.JSONArray", "org.apache.cordova.CallbackContext").implementation = function() { return true; };
         } catch(_) {}
 
         // --- IBM MobileFirst (2 варианта) ---
         try {
-            Java.use("com.worklight.wlclient.api.WLClient").getInstance().pinTrustedCertificatePublicKey.overload("java.lang.String").implementation = function(cert) {
-                logObj("SSLUnpinner.IBMMobileFirst{1}", { cert: cert }, color);
-            };
+            Java.use("com.worklight.wlclient.api.WLClient").getInstance().pinTrustedCertificatePublicKey.overload("java.lang.String").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.worklight.wlclient.api.WLClient").getInstance().pinTrustedCertificatePublicKey.overload("[Ljava.lang.String;").implementation = function(cert) {
-                logObj("SSLUnpinner.IBMMobileFirst{2}", { cert: cert }, color);
-            };
+            Java.use("com.worklight.wlclient.api.WLClient").getInstance().pinTrustedCertificatePublicKey.overload("[Ljava.lang.String;").implementation = function() {};
         } catch(_) {}
 
         // --- IBM WorkLight HostNameVerifierWithCertificatePinning (4 варианта) ---
         try {
-            const WL = Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning");
-            WL.verify.overload("java.lang.String", "javax.net.ssl.SSLSocket").implementation = function(a, b) {};
+            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "javax.net.ssl.SSLSocket").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function(a, b) {};
+            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "java.security.cert.X509Certificate").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "[Ljava.lang.String;", "[Ljava.lang.String;").implementation = function(a, b, c) {};
+            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "[Ljava.lang.String;", "[Ljava.lang.String;").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function(a, b) { return true; };
+            Java.use("com.worklight.wlclient.certificatepinning.HostNameVerifierWithCertificatePinning").verify.overload("java.lang.String", "javax.net.ssl.SSLSession").implementation = function() { return true; };
         } catch(_) {}
 
         // --- Worklight Androidgap ---
         try {
-            Java.use("com.worklight.androidgap.plugin.WLCertificatePinningPlugin").execute.overload("java.lang.String", "org.json.JSONArray", "org.apache.cordova.CallbackContext").implementation = function(a, b, c) {
-                logObj("SSLUnpinner.Worklight.Androidgap", { action: a }, color);
-                return true;
-            };
+            Java.use("com.worklight.androidgap.plugin.WLCertificatePinningPlugin").execute.overload("java.lang.String", "org.json.JSONArray", "org.apache.cordova.CallbackContext").implementation = function() { return true; };
         } catch(_) {}
 
         // --- Netty FingerprintTrustManagerFactory ---
         try {
-            Java.use("io.netty.handler.ssl.util.FingerprintTrustManagerFactory").checkTrusted.implementation = function(type, chain) {};
+            Java.use("io.netty.handler.ssl.util.FingerprintTrustManagerFactory").checkTrusted.implementation = function() {};
         } catch(_) {}
 
         // --- Chromium Cronet ---
         try {
             const Cronet = Java.use("org.chromium.net.impl.CronetEngineBuilderImpl");
-            Cronet.enablePublicKeyPinningBypassForLocalTrustAnchors.overload("boolean").implementation = function(a) {
-                logObj("SSLUnpinner.Cronet.enablePublicKeyPinningBypass", { bypassed: true }, color);
+            Cronet.enablePublicKeyPinningBypassForLocalTrustAnchors.overload("boolean").implementation = function() {
                 return Cronet.enablePublicKeyPinningBypassForLocalTrustAnchors.call(this, true);
             };
             Cronet.addPublicKeyPins.overload("java.lang.String", "java.util.Set", "boolean", "java.util.Date").implementation = function(hostName, pinsSha256, includeSubdomains, expirationDate) {
-                logObj("SSLUnpinner.Cronet.addPublicKeyPins", { host: hostName }, color);
                 return Cronet.addPublicKeyPins.call(this, hostName, pinsSha256, includeSubdomains, expirationDate);
             };
         } catch(_) {}
 
         // --- Flutter HttpCertificatePinning ---
         try {
-            Java.use("diefferson.http_certificate_pinning.HttpCertificatePinning").checkConnexion.overload("java.lang.String", "java.util.List", "java.util.Map", "int", "java.lang.String").implementation = function(a, b, c, d, e) {
-                logObj("SSLUnpinner.Flutter.HttpCertificatePinning", { host: a }, color);
-                return true;
-            };
+            Java.use("diefferson.http_certificate_pinning.HttpCertificatePinning").checkConnexion.overload("java.lang.String", "java.util.List", "java.util.Map", "int", "java.lang.String").implementation = function() { return true; };
         } catch(_) {}
         try {
-            Java.use("com.macif.plugin.sslpinningplugin.SslPinningPlugin").checkConnexion.overload("java.lang.String", "java.util.List", "java.util.Map", "int", "java.lang.String").implementation = function(a, b, c, d, e) {
-                logObj("SSLUnpinner.Flutter.SslPinningPlugin", { host: a }, color);
-                return true;
-            };
+            Java.use("com.macif.plugin.sslpinningplugin.SslPinningPlugin").checkConnexion.overload("java.lang.String", "java.util.List", "java.util.Map", "int", "java.lang.String").implementation = function() { return true; };
         } catch(_) {}
 
         // --- Boye AbstractVerifier ---
         try {
-            Java.use("ch.boye.httpclientandroidlib.conn.ssl.AbstractVerifier").verify.implementation = function(host, ssl) {
-                logObj("SSLUnpinner.Boye.AbstractVerifier", { host: host }, color);
-            };
+            Java.use("ch.boye.httpclientandroidlib.conn.ssl.AbstractVerifier").verify.implementation = function() {};
         } catch(_) {}
 
         // --- Apache AbstractVerifier ---
         try {
-            Java.use("org.apache.http.conn.ssl.AbstractVerifier").verify.implementation = function(a, b, c, d) {
-                logObj("SSLUnpinner.Apache.AbstractVerifier", { host: a }, color);
-            };
+            Java.use("org.apache.http.conn.ssl.AbstractVerifier").verify.implementation = function() {};
         } catch(_) {}
 
         // --- Android WebViewClient (4 варианта) ---
         try {
-            Java.use("android.webkit.WebViewClient").onReceivedSslError.overload("android.webkit.WebView", "android.webkit.SslErrorHandler", "android.net.http.SslError").implementation = function(obj1, handler, sslError) {
-                logObj("SSLUnpinner.WebViewClient.onReceivedSslError{1}", { bypassed: true }, color);
+            Java.use("android.webkit.WebViewClient").onReceivedSslError.overload("android.webkit.WebView", "android.webkit.SslErrorHandler", "android.net.http.SslError").implementation = function(view, handler, error) {
                 handler.proceed();
             };
         } catch(_) {}
         try {
-            Java.use("android.webkit.WebViewClient").onReceivedSslError.overload("android.webkit.WebView", "android.webkit.WebResourceRequest", "android.webkit.WebResourceError").implementation = function(obj1, obj2, obj3) {};
+            Java.use("android.webkit.WebViewClient").onReceivedSslError.overload("android.webkit.WebView", "android.webkit.WebResourceRequest", "android.webkit.WebResourceError").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("android.webkit.WebViewClient").onReceivedError.overload("android.webkit.WebView", "int", "java.lang.String", "java.lang.String").implementation = function(obj1, obj2, obj3, obj4) {};
+            Java.use("android.webkit.WebViewClient").onReceivedError.overload("android.webkit.WebView", "int", "java.lang.String", "java.lang.String").implementation = function() {};
         } catch(_) {}
         try {
-            Java.use("android.webkit.WebViewClient").onReceivedError.overload("android.webkit.WebView", "android.webkit.WebResourceRequest", "android.webkit.WebResourceError").implementation = function(obj1, obj2, obj3) {};
+            Java.use("android.webkit.WebViewClient").onReceivedError.overload("android.webkit.WebView", "android.webkit.WebResourceRequest", "android.webkit.WebResourceError").implementation = function() {};
         } catch(_) {}
 
         // --- React Native RNCWebViewClient ---
@@ -957,28 +872,25 @@ Java.perform(() => {
             Java.use("com.reactnativecommunity.webview.RNCWebViewClient").onReceivedSslError.overload(
                 "android.webkit.WebView", "android.webkit.SslErrorHandler", "android.net.http.SslError"
             ).implementation = function(view, handler, error) {
-                logObj("SSLUnpinner.RNCWebViewClient.onReceivedSslError", { url: error.getUrl() }, color);
                 handler.proceed();
             };
         } catch(_) {}
         try {
             Java.use("com.reactnativecommunity.webview.RNCWebViewClient").onReceivedError.overload(
                 "android.webkit.WebView", "android.webkit.WebResourceRequest", "android.webkit.WebResourceError"
-            ).implementation = function(view, req, err) {};
+            ).implementation = function() {};
         } catch(_) {}
 
         // --- Apache Cordova WebViewClient ---
         try {
             Java.use("org.apache.cordova.CordovaWebViewClient").onReceivedSslError.overload(
                 "android.webkit.WebView", "android.webkit.SslErrorHandler", "android.net.http.SslError"
-            ).implementation = function(obj1, handler, sslError) {
-                logObj("SSLUnpinner.Cordova.onReceivedSslError", { bypassed: true }, color);
+            ).implementation = function(view, handler, error) {
                 handler.proceed();
             };
         } catch(_) {}
 
         // --- Dynamic SSLPeerUnverifiedException Patcher ---
-        // Автоматически ловит SSLPeerUnverifiedException и патчит вызывающий метод
         function rudimentaryFix(typeName) {
             if (typeName === undefined) return;
             return typeName === "boolean" ? true : null;
@@ -994,13 +906,12 @@ Java.perform(() => {
                     if (mtd.implementation) return this.$init(str);
                     const returnTypeName = mtd.returnType.type;
                     mtd.implementation = function() { return rudimentaryFix(returnTypeName); };
-                    logObj("SSLUnpinner.DynamicPatcher", { class: caller.getClassName(), method: caller.getMethodName() }, color);
                 } catch(_) {}
                 return this.$init(str);
             };
         } catch(_) {}
 
-        console.log(`${green}[SSLUnpinner] Bypasses installed: TrustManager, TrustManagerImpl, OkHttp3, Squareup, Trustkit, Conscrypt, CertPinManager, Appcelerator, Fabric, PhoneGap, IBM, WorkLight, Netty, Cronet, Flutter, WebView, Cordova, DynamicPatcher${reset}`);
+        console.log(`${green}[SSLUnpinner] All bypasses installed${reset}`);
     }
 
     // --- EncryptedSharedPreferences: отслеживание зашифрованного хранилища ---

@@ -44,7 +44,6 @@ const MODULES = {
     KeyGenParameterSpec: false, // android.security.keystore
     KeyStore: false,            // java.security.KeyStore
     SSLContext: false,          // javax.net.ssl.SSLContext
-    OkHttp: false,              // okhttp3
     SSLUnpinner: true,          // Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.)
     EncryptedSharedPrefs: false,// androidx.security.crypto
     SQLCipher: false,           // net.sqlcipher
@@ -80,7 +79,6 @@ const MODULES = {
 | `KeyGenParameterSpec` | Параметры генерации ключей Keystore |
 | `KeyStore` | Анализ хранилища ключей Android Keystore |
 | `SSLContext` | Анализ SSL/TLS конфигурации |
-| `OkHttp` | Обнаружение пиннинга сертификатов |
 | `SSLUnpinner` | Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.) |
 | `EncryptedSharedPrefs` | Перехват зашифрованных SharedPreferences |
 | `SQLCipher` | Анализ зашифрованных баз данных |
@@ -181,9 +179,7 @@ const MODULES = {
 ### Безопасность
 
 - **SSLContext** — анализ SSL/TLS конфигурации
-- **OkHttp CertificatePinner** — обнаружение пиннинга сертификатов
 - **SSLUnpinner** — обход SSL пиннинга (27 методов bypass)
-- **TrustManagerImpl** — перехват цепочки доверия
 
 ### Хранение данных
 
