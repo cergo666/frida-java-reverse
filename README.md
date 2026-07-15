@@ -73,7 +73,7 @@ const MODULES = {
 | `IvParameterSpec` | Перехват вектора инициализации |
 | `Tink` | Перехват Google Tink крипто-библиотеки |
 | `SSLUnpinner` | Обход SSL пиннинга (27 методов bypass) |
-| `AdBlocker` | Блокировка рекламы + подавление рекламного шума в крипто-логах |
+| `AdBlocker` | Блокировка рекламы + fake-callback `onAdDismissed` + подавление шума в крипто-логах |
 
 ### Выключены по умолчанию
 
@@ -135,6 +135,12 @@ const MODULES = {
 
 Общая функция для проверки строк по списку ключевых слов. Используется для фильтрации стек-трейсов, URL и имён Activity.
 
+### Fake-callback `onAdDismissed`
+
+Некоторые приложения (VPN-клиенты, стриминговые сервисы) показывают interstitial/rewarded рекламу перед функционалом и **ждут callback `onAdDismissed`** перед выполнением. При простой блокировке Activity callback не срабатывает — приложение зависает.
+
+AdBlocker перехватывает setter'ы рекламных listener'ов (`setEventListener`, `setFullScreenContentCallback`, `setAdListener`) для Yandex, Google AdMob и Facebook. При блокировке рекламной Activity автоматически вызывается `onAdDismissed` / `onAdDismissedFullScreenContent` — приложение думает, что реклама была показана и закрыта, и продолжает работу.
+
 ---
 
 ### Методы bypass
@@ -191,7 +197,7 @@ const MODULES = {
 
 ### Удобство
 
-- **AdBlocker** — блокировка рекламы с 5 уровнями защиты
+- **AdBlocker** — блокировка рекламы: 5 уровней + fake-callback `onAdDismissed` для приложений, зависающих на рекламе
 - **PRINT_STACKTRACE** — переключатель вывода стека вызовов
 - **AD_KEYWORDS** — фильтрация рекламных/аналитических SDK
 - **Счётчик вызовов (#N)** — показывает сколько раз вызван каждый метод

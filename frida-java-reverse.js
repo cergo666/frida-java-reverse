@@ -1204,22 +1204,160 @@ Java.perform(() => {
             });
         } catch(_) {}
 
+        // ==================== AD LISTENER INTERCEPTION ====================
+        // Перехват setter'ов рекламных listener'ов для fake-callback при блокировке Activity
+        // Некоторые приложения ждут onAdDismissed перед выполнением функционала (VPN, загрузка контента)
+        const adDismissCallbacks = []; // Список активных callback-объектов
+
+        // Yandex Mobile Ads — InterstitialAdEventListener
+        try {
+            const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
+            YI.setEventListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd");
+            YR.setEventListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Yandex", listener: listener, type: "rewarded" });
+                        console.log(`${yellow}[AdBlocker] Captured Yandex RewardedAdEventListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+
+        // Google AdMob — FullScreenContentCallback / AdListener
+        try {
+            const GA = Java.use("com.google.android.gms.ads.interstitial.InterstitialAd");
+            GA.setFullScreenContentCallback.overloads.forEach(o => {
+                o.implementation = function (callback) {
+                    if (callback) {
+                        adDismissCallbacks.push({ sdk: "Google", listener: callback, type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured Google FullScreenContentCallback${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            const GR = Java.use("com.google.android.gms.ads.rewarded.RewardedAd");
+            GR.setFullScreenContentCallback.overloads.forEach(o => {
+                o.implementation = function (callback) {
+                    if (callback) {
+                        adDismissCallbacks.push({ sdk: "Google", listener: callback, type: "rewarded" });
+                        console.log(`${yellow}[AdBlocker] Captured Google Rewarded FullScreenContentCallback${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            const GAV = Java.use("com.google.android.gms.ads.AdView");
+            GAV.setAdListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Google", listener: listener, type: "banner" });
+                        console.log(`${yellow}[AdBlocker] Captured Google AdListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+
+        // Facebook — AdListener
+        try {
+            const FBA = Java.use("com.facebook.ads.InterstitialAd");
+            FBA.setAdListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Facebook", listener: listener, type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured Facebook InterstitialAdListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            const FBR = Java.use("com.facebook.ads.RewardedVideoAd");
+            FBR.setAdListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Facebook", listener: listener, type: "rewarded" });
+                        console.log(`${yellow}[AdBlocker] Captured Facebook RewardedAdListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+
         // ==================== ACTIVITY-LEVEL BLOCKING ====================
-        // Блокировка рекламных Activity до их создания — предотвращает чёрные экраны
+        // Блокировка рекламных Activity + fake-callback onAdDismissed
+        function fireAdDismissCallbacks(activityName) {
+            let fired = 0;
+            for (let i = adDismissCallbacks.length - 1; i >= 0; i--) {
+                const cb = adDismissCallbacks[i];
+                try {
+                    if (cb.sdk === "Yandex") {
+                        if (cb.listener.onAdDismissed) {
+                            cb.listener.onAdDismissed();
+                            fired++;
+                        }
+                    } else if (cb.sdk === "Google") {
+                        if (cb.listener.onAdDismissedFullScreenContent) {
+                            cb.listener.onAdDismissedFullScreenContent();
+                            fired++;
+                        } else if (cb.listener.onAdClosed) {
+                            cb.listener.onAdClosed();
+                            fired++;
+                        }
+                    } else if (cb.sdk === "Facebook") {
+                        if (cb.listener.onLoggingImpression) {
+                            // Facebook uses onInterstitialDismissed or onAdClicked
+                            if (cb.listener.onInterstitialDismissed) {
+                                cb.listener.onInterstitialDismissed();
+                                fired++;
+                            } else if (cb.listener.onAdDismissed) {
+                                cb.listener.onAdDismissed();
+                                fired++;
+                            }
+                        }
+                    }
+                } catch(e) {
+                    console.log(`${red}[AdBlocker] Callback fire error (${cb.sdk}): ${e}${reset}`);
+                }
+            }
+            return fired;
+        }
+
         try {
             Java.use("android.app.Activity").startActivity.overloads.forEach(o => {
                 o.implementation = function (intent) {
                     try {
                         const comp = intent.getComponent();
                         if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                            logObj("AdBlocker.ActivityBlocked", { activity: comp.getClassName() }, color);
+                            const activityName = comp.getClassName();
+                            const fired = fireAdDismissCallbacks(activityName);
+                            if (fired > 0) {
+                                console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed fired (${fired} callbacks)${reset}`);
+                            } else {
+                                logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
+                            }
                             return;
                         }
                     } catch(_) {}
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Activity-level blocking enabled${reset}`);
+            console.log(`${green}[AdBlocker] Activity-level blocking + fake-callback enabled${reset}`);
         } catch(_) {}
 
         // ==================== WEBVIEW BLOCKING ====================

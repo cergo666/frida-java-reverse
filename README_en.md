@@ -73,7 +73,7 @@ Global toggle at the top of the file. When `true`, each intercepted call include
 | `IvParameterSpec` | Intercept initialization vectors |
 | `Tink` | Intercept Google Tink crypto library |
 | `SSLUnpinner` | Bypass SSL certificate pinning (27 methods) |
-| `AdBlocker` | Block ads + suppress ad SDK noise in crypto logs |
+| `AdBlocker` | Block ads + fake `onAdDismissed` callback + suppress ad SDK noise in crypto logs |
 
 ### Disabled by default
 
@@ -135,6 +135,12 @@ Global toggle at the top of the file. When `true`, each intercepted call include
 
 Shared function for checking strings against keyword lists. Used for filtering stack traces, URLs, and Activity names.
 
+### Fake `onAdDismissed` callback
+
+Some apps (VPN clients, streaming services) show interstitial/rewarded ads before functionality and **wait for the `onAdDismissed` callback** before proceeding. Simply blocking the Activity prevents the callback from firing — the app hangs indefinitely.
+
+AdBlocker intercepts ad SDK listener setters (`setEventListener`, `setFullScreenContentCallback`, `setAdListener`) for Yandex, Google AdMob, and Facebook. When an ad Activity is blocked, it automatically fires `onAdDismissed` / `onAdDismissedFullScreenContent` — the app thinks the ad was shown and dismissed, and continues normally.
+
 ---
 
 ### Bypass methods
@@ -191,7 +197,7 @@ Shared function for checking strings against keyword lists. Used for filtering s
 
 ### Convenience
 
-- **AdBlocker** -- 5-level ad blocking + noise suppression in crypto logs
+- **AdBlocker** -- 5-level ad blocking + fake `onAdDismissed` callback for apps that wait for ad dismissal
 - **PRINT_STACKTRACE** -- toggle stack trace output
 - **AD_KEYWORDS** -- filter ad/analytics SDK noise from crypto operations
 - **Call counter (#N)** -- shows how many times each method was called
