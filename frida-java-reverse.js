@@ -1317,19 +1317,8 @@ Java.perform(() => {
                 const cb = adDismissCallbacks[i];
                 try {
                     if (cb.sdk === "Yandex") {
-                        if (cb.listener.onAdShown) {
-                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdShown${reset}`);
-                            cb.listener.onAdShown();
-                        }
-                        if (cb.listener.onAdDismissed) {
-                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdDismissed${reset}`);
-                            cb.listener.onAdDismissed();
-                            fired++;
-                        }
+                        if (cb.listener.onAdDismissed) { cb.listener.onAdDismissed(); fired++; }
                     } else if (cb.sdk === "Google") {
-                        if (cb.listener.onAdShowedFullScreenContent) {
-                            cb.listener.onAdShowedFullScreenContent();
-                        }
                         if (cb.listener.onAdDismissedFullScreenContent) { cb.listener.onAdDismissedFullScreenContent(); fired++; }
                         else if (cb.listener.onAdClosed) { cb.listener.onAdClosed(); fired++; }
                     } else if (cb.sdk === "Facebook") {
@@ -1351,11 +1340,8 @@ Java.perform(() => {
                 const comp = intent.getComponent();
                 if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
                     const activityName = comp.getClassName();
-                    console.log(`${cyan}[AdBlocker] Ad Activity detected: ${activityName}, callbacks: ${adDismissCallbacks.length}${reset}`);
                     setTimeout(function() {
-                        console.log(`${cyan}[AdBlocker] Firing callbacks for ${activityName}...${reset}`);
                         const fired = fireAdDismissCallbacks(activityName);
-                        console.log(`${cyan}[AdBlocker] Fired ${fired} callbacks for ${activityName}${reset}`);
                         if (fired > 0) {
                             console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
                         } else {
@@ -1375,7 +1361,6 @@ Java.perform(() => {
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Activity.startActivity hooked${reset}`);
         } catch(_) {}
         try {
             Java.use("android.app.Activity").startActivityForResult.overloads.forEach(o => {
@@ -1384,9 +1369,37 @@ Java.perform(() => {
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Activity.startActivityForResult hooked${reset}`);
         } catch(_) {}
-        console.log(`${green}[AdBlocker] Activity-level blocking + fake-callback enabled${reset}`);
+        console.log(`${green}[AdBlocker] Activity-level blocking enabled${reset}`);
+
+        // ==================== BYPASS isNeedShowAds CHECK ====================
+        // Приложения с VPN/стримингом блокируются после показа рекламы из-за
+        // internal gate (a4/d.b). Самый надёжный способ — вернуть false на проверке.
+        try {
+            Java.use("uq.f0").g.overloads.forEach(o => {
+                o.implementation = function (continuation) {
+                    console.log(`${yellow}[AdBlocker] isNeedShowAds bypassed → false${reset}`);
+                    return Java.use("java.lang.Boolean").$new(false);
+                };
+            });
+            console.log(`${green}[AdBlocker] isNeedShowAds bypass enabled (uq.f0.g)${reset}`);
+        } catch(_) {
+            // Альтернативный путь: ищем метод по строке "isNeedShowAds"
+            try {
+                Java.enumerateLoadedClasses({
+                    onMatch: function(name) {
+                        try {
+                            const cls = Java.use(name);
+                            cls.g.overloads.forEach(o => {
+                                const src = o.toString();
+                                if (src.indexOf("uq/f0") === -1) return;
+                            });
+                        } catch(_) {}
+                    },
+                    onComplete: function() {}
+                });
+            } catch(_) {}
+        }
 
         // ==================== WEBVIEW BLOCKING ====================
         // Блокировка рекламных URL в WebView (file:// пропускаются — это локальные контроллеры SDK)
