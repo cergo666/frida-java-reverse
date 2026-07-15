@@ -1215,7 +1215,15 @@ Java.perform(() => {
             YI.show.overloads.forEach(o => {
                 o.implementation = function (activity) {
                     logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color);
-                    fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
+                    // Отложить callback — корутина suspended ПОСЛЕ show() return
+                    const Handler = Java.use("android.os.Handler");
+                    const Looper = Java.use("android.os.Looper");
+                    const mainLooper = Looper.getMainLooper();
+                    Java.use("android.os.Handler").$new(mainLooper).post(Java.use("java.lang.Runnable").$new({
+                        run: function() {
+                            fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
+                        }
+                    }));
                     return;
                 };
             });
@@ -1376,12 +1384,21 @@ Java.perform(() => {
                     try {
                         const comp = intent.getComponent();
                         if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                            const fired = fireAdDismissCallbacks(comp.getClassName());
-                            if (fired > 0) {
-                                console.log(`${green}[AdBlocker.ActivityBlocked] ${comp.getClassName()} → fake onAdDismissed (${fired})${reset}`);
-                            } else {
-                                logObj("AdBlocker.ActivityBlocked", { activity: comp.getClassName() }, color);
-                            }
+                            const activityName = comp.getClassName();
+                            // Отложить callback — корутина suspended ПОСЛЕ.startActivity return
+                            const Handler = Java.use("android.os.Handler");
+                            const Looper = Java.use("android.os.Looper");
+                            const mainLooper = Looper.getMainLooper();
+                            Java.use("android.os.Handler").$new(mainLooper).post(Java.use("java.lang.Runnable").$new({
+                                run: function() {
+                                    const fired = fireAdDismissCallbacks(activityName);
+                                    if (fired > 0) {
+                                        console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
+                                    } else {
+                                        logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
+                                    }
+                                }
+                            }));
                             return;
                         }
                     } catch(_) {}
