@@ -14,6 +14,8 @@
 
 Оригинальный скрипт предоставлял базовый перехват `javax.crypto.Cipher` с логированием ключей, IV и данных.
 
+SSL Unpinner основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner/) от Maurizio Siddu.
+
 ---
 
 ## Быстрый старт
@@ -64,6 +66,7 @@ const MODULES = {
 | `SecretKeySpec` | Прямой перехват создания ключей |
 | `IvParameterSpec` | Перехват вектора инициализации |
 | `Tink` | Перехват Google Tink крипто-библиотеки |
+| `SSLUnpinner` | Обход SSL пиннинга (27 методов bypass) |
 | `AdBlocker` | Блокировка рекламы + подавление рекламного шума в крипто-логах |
 
 ### Выключены по умолчанию
@@ -79,7 +82,6 @@ const MODULES = {
 | `KeyGenParameterSpec` | Параметры генерации ключей Keystore |
 | `KeyStore` | Анализ хранилища ключей Android Keystore |
 | `SSLContext` | Анализ SSL/TLS конфигурации |
-| `SSLUnpinner` | Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.) |
 | `EncryptedSharedPrefs` | Перехват зашифрованных SharedPreferences |
 | `SQLCipher` | Анализ зашифрованных баз данных |
 
