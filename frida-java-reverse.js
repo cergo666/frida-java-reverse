@@ -1201,16 +1201,22 @@ Java.perform(() => {
         // Yandex Mobile Ads — hook interface (Frida resolves to all implementations)
         try {
             const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
+            console.log(`${green}[AdBlocker] Yandex InterstitialAd class found, hooking...${reset}`);
             YI.setAdEventListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
                         adDismissCallbacks.push({ sdk: "Yandex", listener: Java.retain(listener), type: "interstitial" });
-                        console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener${reset}`);
+                        console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener (total: ${adDismissCallbacks.length})${reset}`);
                     }
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Yandex InterstitialAd.setAdEventListener hooked${reset}`);
+            YI.show.overloads.forEach(o => {
+                o.implementation = function (activity) {
+                    console.log(`${yellow}[AdBlocker] Yandex InterstitialAd.show called, callbacks: ${adDismissCallbacks.length}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
         } catch(e) { console.log(`${yellow}[AdBlocker] Yandex InterstitialAd not available: ${e}${reset}`); }
 
         try {
@@ -1311,7 +1317,13 @@ Java.perform(() => {
                 const cb = adDismissCallbacks[i];
                 try {
                     if (cb.sdk === "Yandex") {
-                        if (cb.listener.onAdDismissed) { cb.listener.onAdDismissed(); fired++; }
+                        if (cb.listener.onAdDismissed) {
+                            console.log(`${cyan}[AdBlocker] Calling Yandex onAdDismissed on ${cb.listener.getClass().getName()}${reset}`);
+                            cb.listener.onAdDismissed();
+                            fired++;
+                        } else {
+                            console.log(`${yellow}[AdBlocker] Yandex listener has no onAdDismissed method${reset}`);
+                        }
                     } else if (cb.sdk === "Google") {
                         if (cb.listener.onAdDismissedFullScreenContent) { cb.listener.onAdDismissedFullScreenContent(); fired++; }
                         else if (cb.listener.onAdClosed) { cb.listener.onAdClosed(); fired++; }
@@ -1334,8 +1346,11 @@ Java.perform(() => {
                 const comp = intent.getComponent();
                 if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
                     const activityName = comp.getClassName();
+                    console.log(`${cyan}[AdBlocker] Ad Activity detected: ${activityName}, callbacks: ${adDismissCallbacks.length}${reset}`);
                     setTimeout(function() {
+                        console.log(`${cyan}[AdBlocker] Firing callbacks for ${activityName}...${reset}`);
                         const fired = fireAdDismissCallbacks(activityName);
+                        console.log(`${cyan}[AdBlocker] Fired ${fired} callbacks for ${activityName}${reset}`);
                         if (fired > 0) {
                             console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
                         } else {
