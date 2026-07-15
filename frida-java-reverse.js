@@ -1200,50 +1200,27 @@ Java.perform(() => {
         // Некоторые приложения ждут onAdDismissed перед выполнением функционала (VPN, загрузка контента)
         const adDismissCallbacks = []; // Список активных callback-объектов
 
-        // Yandex Mobile Ads — динамический поиск реализации InterstitialAd
-        function hookYandexInterstitial() {
-            const ifaceName = "com.yandex.mobile.ads.interstitial.InterstitialAd";
-            const listenerIface = "com.yandex.mobile.ads.interstitial.InterstitialAdEventListener";
-            let hooked = false;
-
-            Java.enumerateLoadedClasses({
-                onMatch: function(className) {
-                    if (hooked) return;
-                    try {
-                        const cls = Java.use(className);
-                        const ifaces = cls.class.getInterfaces();
-                        for (let i = 0; i < ifaces.length; i++) {
-                            if (ifaces[i].getName() === ifaceName) {
-                                // Нашли реализацию InterstitialAd
-                                cls.setAdEventListener.overloads.forEach(o => {
-                                    o.implementation = function (listener) {
-                                        if (listener) {
-                                            adDismissCallbacks.push({ sdk: "Yandex", listener: Java.retain(listener), type: "interstitial" });
-                                            console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener (${className})${reset}`);
-                                        }
-                                        return o.apply(this, arguments);
-                                    };
-                                });
-                                cls.show.overloads.forEach(o => {
-                                    o.implementation = function (activity) {
-                                        logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color);
-                                        fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
-                                        return;
-                                    };
-                                });
-                                console.log(`${green}[AdBlocker] Yandex InterstitialAd hooked on ${className}${reset}`);
-                                hooked = true;
-                                return;
-                            }
-                        }
-                    } catch(_) {}
-                },
-                onComplete: function() {
-                    if (!hooked) console.log(`${yellow}[AdBlocker] Yandex InterstitialAd class not found (SDK not present)${reset}`);
-                }
+        // Yandex Mobile Ads — хук на интерфейсе (Frida резолвит на все реализации)
+        try {
+            const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
+            YI.setAdEventListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "Yandex", listener: Java.retain(listener), type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured Yandex InterstitialAdEventListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
             });
-        }
-        try { hookYandexInterstitial(); } catch(e) { console.log(`${red}[AdBlocker] Yandex hook error: ${e}${reset}`); }
+            YI.show.overloads.forEach(o => {
+                o.implementation = function (activity) {
+                    logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color);
+                    fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
+                    return;
+                };
+            });
+            console.log(`${green}[AdBlocker] Yandex InterstitialAd interface hooked${reset}`);
+        } catch(e) { console.log(`${yellow}[AdBlocker] Yandex InterstitialAd not available: ${e}${reset}`); }
 
         // Yandex Mobile Ads — RewardedAd
         try {
