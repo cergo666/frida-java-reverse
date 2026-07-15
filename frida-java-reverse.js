@@ -1213,8 +1213,15 @@ Java.perform(() => {
             });
             YI.show.overloads.forEach(o => {
                 o.implementation = function (activity) {
-                    console.log(`${yellow}[AdBlocker] Yandex InterstitialAd.show called, callbacks: ${adDismissCallbacks.length}${reset}`);
-                    return o.apply(this, arguments);
+                    console.log(`${yellow}[AdBlocker] Yandex InterstitialAd.show → blocked, firing callback${reset}`);
+                    // Не вызываем оригинальный show() — Activity не запустится,
+                    // watchdog не запустится, gate не установится
+                    // Вызываем onAdDismissed() синхронно — coroutine resume дождётся suspend
+                    const fired = fireAdDismissCallbacks();
+                    if (fired > 0) {
+                        console.log(`${green}[AdBlocker] Yandex show blocked → fake onAdDismissed (${fired})${reset}`);
+                    }
+                    return;
                 };
             });
         } catch(e) { console.log(`${yellow}[AdBlocker] Yandex InterstitialAd not available: ${e}${reset}`); }
@@ -1311,7 +1318,7 @@ Java.perform(() => {
         } catch(_) {}
 
         // ==================== ACTIVITY-LEVEL BLOCKING ====================
-        function fireAdDismissCallbacks(activityName) {
+        function fireAdDismissCallbacks() {
             let fired = 0;
             for (let i = adDismissCallbacks.length - 1; i >= 0; i--) {
                 const cb = adDismissCallbacks[i];
@@ -1339,18 +1346,30 @@ Java.perform(() => {
             try {
                 const comp = intent.getComponent();
                 if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                    const activityName = comp.getClassName();
-                    setTimeout(function() {
-                        const fired = fireAdDismissCallbacks(activityName);
-                        if (fired > 0) {
-                            console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
-                        } else {
-                            logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
-                        }
-                    }, 100);
+                    logObj("AdBlocker.ActivityBlocked", { activity: comp.getClassName() }, color);
                     return true;
                 }
             } catch(_) {}
+            return false;
+        }
+
+        try {
+            Java.use("android.app.Activity").startActivity.overloads.forEach(o => {
+                o.implementation = function (intent) {
+                    if (blockAdActivity(intent)) return;
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            Java.use("android.app.Activity").startActivityForResult.overloads.forEach(o => {
+                o.implementation = function (intent, requestCode) {
+                    if (blockAdActivity(intent)) return;
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        console.log(`${green}[AdBlocker] Activity-level blocking enabled${reset}`);
             return false;
         }
 
