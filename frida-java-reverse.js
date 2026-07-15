@@ -1226,6 +1226,32 @@ Java.perform(() => {
             });
         } catch(_){}
 
+        // IronSource / LevelPlay — InterstitialListener / LevelPlayInterstitialListener
+        try {
+            const IS = Java.use("com.ironsource.mediationsdk.IronSource");
+            IS.setInterstitialListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "IronSource", listener: listener, type: "interstitial" });
+                        console.log(`${yellow}[AdBlocker] Captured IronSource InterstitialListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+        try {
+            const IS = Java.use("com.ironsource.mediationsdk.IronSource");
+            IS.setRewardedVideoListener.overloads.forEach(o => {
+                o.implementation = function (listener) {
+                    if (listener) {
+                        adDismissCallbacks.push({ sdk: "IronSource", listener: listener, type: "rewarded" });
+                        console.log(`${yellow}[AdBlocker] Captured IronSource RewardedVideoListener${reset}`);
+                    }
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(_) {}
+
         // Google AdMob — FullScreenContentCallback / AdListener
         try {
             const GA = Java.use("com.google.android.gms.ads.interstitial.InterstitialAd");
@@ -1320,6 +1346,14 @@ Java.perform(() => {
                                 cb.listener.onAdDismissed();
                                 fired++;
                             }
+                        }
+                    } else if (cb.sdk === "IronSource") {
+                        if (cb.listener.onInterstitialAdClosed) {
+                            cb.listener.onInterstitialAdClosed();
+                            fired++;
+                        } else if (cb.listener.onRewardedVideoAdClosed) {
+                            cb.listener.onRewardedVideoAdClosed();
+                            fired++;
                         }
                     }
                 } catch(e) {
