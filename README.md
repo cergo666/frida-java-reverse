@@ -45,6 +45,7 @@ const MODULES = {
     KeyStore: false,            // java.security.KeyStore
     SSLContext: false,          // javax.net.ssl.SSLContext
     OkHttp: false,              // okhttp3
+    SSLUnpinner: true,          // Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.)
     EncryptedSharedPrefs: false,// androidx.security.crypto
     SQLCipher: false,           // net.sqlcipher
     Tink: true,                 // com.google.crypto.tink
@@ -80,6 +81,7 @@ const MODULES = {
 | `KeyStore` | Анализ хранилища ключей Android Keystore |
 | `SSLContext` | Анализ SSL/TLS конфигурации |
 | `OkHttp` | Обнаружение пиннинга сертификатов |
+| `SSLUnpinner` | Обход SSL пиннинга (OkHttp, Conscrypt, WebView, Flutter и др.) |
 | `EncryptedSharedPrefs` | Перехват зашифрованных SharedPreferences |
 | `SQLCipher` | Анализ зашифрованных баз данных |
 
@@ -130,6 +132,38 @@ const MODULES = {
 
 ---
 
+## SSLUnpinner — детали
+
+Основан на [frida-multiple-unpinner](https://codeshare.frida.re/@akabe1/frida-multiple-unpinner) от Maurizio Siddu.
+
+### Методы bypass
+
+| Метод | Описание |
+|-------|----------|
+| TrustManager | Подмена TrustManager на доверяющий всё (Android < 7) |
+| TrustManagerImpl | Обход `checkTrustedRecursive` и `verifyChain` (Android > 7) |
+| OkHttp3 | 4 варианта: `check(String, List)`, `check(String, Certificate)`, `check(String, Certificate[])`, `check$okhttp` |
+| Squareup | CertificatePinner (2) + OkHostnameVerifier (2) — OkHttp < v3 |
+| Trustkit | OkHostnameVerifier (2) + PinningTrustManager |
+| OpenSSLSocketImpl | Conscrypt (2) + Apache Harmony |
+| OpenSSLEngineSocketImpl | Conscrypt engine |
+| CertPinManager | Conscrypt (2) + CWAC-Netsecurity |
+| Appcelerator | PinningTrustManager |
+| Fabric | PinningTrustManager |
+| PhoneGap | sslCertificateChecker |
+| IBM MobileFirst | pinTrustedCertificatePublicKey (2) |
+| IBM WorkLight | HostNameVerifierWithCertificatePinning (4) + Androidgap |
+| Netty | FingerprintTrustManagerFactory |
+| Chromium Cronet | enablePublicKeyPinningBypass + addPublicKeyPins |
+| Flutter | HttpCertificatePinning + SslPinningPlugin |
+| Boye / Apache | AbstractVerifier |
+| WebViewClient | onReceivedSslError (2) + onReceivedError (2) |
+| React Native | RNCWebViewClient onReceivedSslError + onReceivedError |
+| Cordova | WebViewClient onReceivedSslError |
+| Dynamic Patcher | Автопатч SSLPeerUnverifiedException для неизвестных методов |
+
+---
+
 ## Что добавлено
 
 ### Крипто-модули
@@ -148,6 +182,7 @@ const MODULES = {
 
 - **SSLContext** — анализ SSL/TLS конфигурации
 - **OkHttp CertificatePinner** — обнаружение пиннинга сертификатов
+- **SSLUnpinner** — обход SSL пиннинга (27 методов bypass)
 - **TrustManagerImpl** — перехват цепочки доверия
 
 ### Хранение данных
