@@ -1196,11 +1196,9 @@ Java.perform(() => {
         } catch(_) {}
 
         // ==================== AD LISTENER INTERCEPTION ====================
-        // Перехват setter'ов рекламных listener'ов для fake-callback при блокировке Activity
-        // Некоторые приложения ждут onAdDismissed перед выполнением функционала (VPN, загрузка контента)
-        const adDismissCallbacks = []; // Список активных callback-объектов
+        const adDismissCallbacks = [];
 
-        // Yandex Mobile Ads — хук на интерфейсе (Frida резолвит на все реализации)
+        // Yandex Mobile Ads — hook interface (Frida resolves to all implementations)
         try {
             const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
             YI.setAdEventListener.overloads.forEach(o => {
@@ -1212,23 +1210,9 @@ Java.perform(() => {
                     return o.apply(this, arguments);
                 };
             });
-            YI.show.overloads.forEach(o => {
-                o.implementation = function (activity) {
-                    logObj("AdBlocker.Yandex.Interstitial.show", { blocked: true }, color);
-                    const Handler = Java.use("android.os.Handler");
-                    const Looper = Java.use("android.os.Looper");
-                    Java.use("android.os.Handler").$new(Looper.getMainLooper()).post(Java.use("java.lang.Runnable").$new({
-                        run: function() {
-                            fireAdDismissCallbacks("com.yandex.mobile.ads.common.AdActivity");
-                        }
-                    }));
-                    return;
-                };
-            });
-            console.log(`${green}[AdBlocker] Yandex InterstitialAd interface hooked${reset}`);
+            console.log(`${green}[AdBlocker] Yandex InterstitialAd.setAdEventListener hooked${reset}`);
         } catch(e) { console.log(`${yellow}[AdBlocker] Yandex InterstitialAd not available: ${e}${reset}`); }
 
-        // Yandex Mobile Ads — RewardedAd
         try {
             const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd");
             YR.setAdEventListener.overloads.forEach(o => {
@@ -1242,7 +1226,7 @@ Java.perform(() => {
             });
         } catch(_){}
 
-        // IronSource / LevelPlay — LevelPlayInterstitialListener / LevelPlayRewardedVideoListener
+        // IronSource / LevelPlay
         try {
             const IS = Java.use("com.ironsource.mediationsdk.IronSource");
             IS.setLevelPlayInterstitialListener.overloads.forEach(o => {
@@ -1268,7 +1252,7 @@ Java.perform(() => {
             });
         } catch(_) {}
 
-        // Google AdMob — FullScreenContentCallback / AdListener
+        // Google AdMob
         try {
             const GA = Java.use("com.google.android.gms.ads.interstitial.InterstitialAd");
             GA.setFullScreenContentCallback.overloads.forEach(o => {
@@ -1293,20 +1277,8 @@ Java.perform(() => {
                 };
             });
         } catch(_) {}
-        try {
-            const GAV = Java.use("com.google.android.gms.ads.AdView");
-            GAV.setAdListener.overloads.forEach(o => {
-                o.implementation = function (listener) {
-                    if (listener) {
-                        adDismissCallbacks.push({ sdk: "Google", listener: Java.retain(listener), type: "banner" });
-                        console.log(`${yellow}[AdBlocker] Captured Google AdListener${reset}`);
-                    }
-                    return o.apply(this, arguments);
-                };
-            });
-        } catch(_) {}
 
-        // Facebook — AdListener
+        // Facebook
         try {
             const FBA = Java.use("com.facebook.ads.InterstitialAd");
             FBA.setAdListener.overloads.forEach(o => {
@@ -1333,41 +1305,22 @@ Java.perform(() => {
         } catch(_) {}
 
         // ==================== ACTIVITY-LEVEL BLOCKING ====================
-        // Блокировка рекламных Activity + fake-callback onAdDismissed
         function fireAdDismissCallbacks(activityName) {
             let fired = 0;
             for (let i = adDismissCallbacks.length - 1; i >= 0; i--) {
                 const cb = adDismissCallbacks[i];
                 try {
                     if (cb.sdk === "Yandex") {
-                        if (cb.listener.onAdDismissed) {
-                            cb.listener.onAdDismissed();
-                            fired++;
-                        }
+                        if (cb.listener.onAdDismissed) { cb.listener.onAdDismissed(); fired++; }
                     } else if (cb.sdk === "Google") {
-                        if (cb.listener.onAdDismissedFullScreenContent) {
-                            cb.listener.onAdDismissedFullScreenContent();
-                            fired++;
-                        } else if (cb.listener.onAdClosed) {
-                            cb.listener.onAdClosed();
-                            fired++;
-                        }
+                        if (cb.listener.onAdDismissedFullScreenContent) { cb.listener.onAdDismissedFullScreenContent(); fired++; }
+                        else if (cb.listener.onAdClosed) { cb.listener.onAdClosed(); fired++; }
                     } else if (cb.sdk === "Facebook") {
-                        if (cb.listener.onInterstitialDismissed) {
-                            cb.listener.onInterstitialDismissed();
-                            fired++;
-                        } else if (cb.listener.onAdDismissed) {
-                            cb.listener.onAdDismissed();
-                            fired++;
-                        }
+                        if (cb.listener.onInterstitialDismissed) { cb.listener.onInterstitialDismissed(); fired++; }
+                        else if (cb.listener.onAdDismissed) { cb.listener.onAdDismissed(); fired++; }
                     } else if (cb.sdk === "IronSource") {
-                        if (cb.listener.onAdClosed) {
-                            cb.listener.onAdClosed(null);
-                            fired++;
-                        } else if (cb.listener.onInterstitialAdClosed) {
-                            cb.listener.onInterstitialAdClosed();
-                            fired++;
-                        }
+                        if (cb.listener.onAdClosed) { cb.listener.onAdClosed(null); fired++; }
+                        else if (cb.listener.onInterstitialAdClosed) { cb.listener.onInterstitialAdClosed(); fired++; }
                     }
                 } catch(e) {
                     console.log(`${red}[AdBlocker] Callback error (${cb.sdk}): ${e}${reset}`);
@@ -1376,61 +1329,42 @@ Java.perform(() => {
             return fired;
         }
 
-        try {
-            const startActivityFn = Java.use("android.app.Activity").startActivity;
-            startActivityFn.overloads.forEach(o => {
-                o.implementation = function (intent) {
-                    try {
-                        const comp = intent.getComponent();
-                        if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                            const activityName = comp.getClassName();
-                            const Handler = Java.use("android.os.Handler");
-                            const Looper = Java.use("android.os.Looper");
-                            Java.use("android.os.Handler").$new(Looper.getMainLooper()).post(Java.use("java.lang.Runnable").$new({
-                                run: function() {
-                                    const fired = fireAdDismissCallbacks(activityName);
-                                    if (fired > 0) {
-                                        console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
-                                    } else {
-                                        logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
-                                    }
-                                }
-                            }));
-                            return;
+        function blockAdActivity(intent) {
+            try {
+                const comp = intent.getComponent();
+                if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
+                    const activityName = comp.getClassName();
+                    setTimeout(function() {
+                        const fired = fireAdDismissCallbacks(activityName);
+                        if (fired > 0) {
+                            console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
+                        } else {
+                            logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
                         }
-                    } catch(_) {}
+                    }, 50);
+                    return true;
+                }
+            } catch(_) {}
+            return false;
+        }
+
+        try {
+            Java.use("android.app.Activity").startActivity.overloads.forEach(o => {
+                o.implementation = function (intent) {
+                    if (blockAdActivity(intent)) return;
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Activity.startActivity blocked${reset}`);
+            console.log(`${green}[AdBlocker] Activity.startActivity hooked${reset}`);
         } catch(_) {}
         try {
-            const startActivityForResultFn = Java.use("android.app.Activity").startActivityForResult;
-            startActivityForResultFn.overloads.forEach(o => {
+            Java.use("android.app.Activity").startActivityForResult.overloads.forEach(o => {
                 o.implementation = function (intent, requestCode) {
-                    try {
-                        const comp = intent.getComponent();
-                        if (comp && hasAdKeyword(comp.getClassName(), AD_ACTIVITY_PREFIXES)) {
-                            const activityName = comp.getClassName();
-                            const Handler = Java.use("android.os.Handler");
-                            const Looper = Java.use("android.os.Looper");
-                            Java.use("android.os.Handler").$new(Looper.getMainLooper()).post(Java.use("java.lang.Runnable").$new({
-                                run: function() {
-                                    const fired = fireAdDismissCallbacks(activityName);
-                                    if (fired > 0) {
-                                        console.log(`${green}[AdBlocker.ActivityBlocked] ${activityName} → fake onAdDismissed (${fired})${reset}`);
-                                    } else {
-                                        logObj("AdBlocker.ActivityBlocked", { activity: activityName }, color);
-                                    }
-                                }
-                            }));
-                            return;
-                        }
-                    } catch(_) {}
+                    if (blockAdActivity(intent)) return;
                     return o.apply(this, arguments);
                 };
             });
-            console.log(`${green}[AdBlocker] Activity.startActivityForResult blocked${reset}`);
+            console.log(`${green}[AdBlocker] Activity.startActivityForResult hooked${reset}`);
         } catch(_) {}
         console.log(`${green}[AdBlocker] Activity-level blocking + fake-callback enabled${reset}`);
 
