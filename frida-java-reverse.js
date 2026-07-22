@@ -957,7 +957,7 @@ Java.perform(() => {
         } catch(_) {}
     }
 
-    // --- Tink: отслеживание Google Tink криптографической библиотеки ---
+    // --- Tink: Google Tink keyset extraction ---
     if (MODULES.Tink) {
         const color = nextColor();
         try {
@@ -970,6 +970,71 @@ Java.perform(() => {
             });
             KSH.getPrimitive.overloads.forEach(o => {
                 o.implementation = function () { logObj("Tink.KeysetHandle.getPrimitive", {}, color); return o.apply(this, arguments); };
+            });
+        } catch(_) {}
+
+        // Keyset.Builder — extract keys from proto builder
+        try {
+            let tinkPrimaryKeyId = 0;
+            let tinkKeys = [];
+
+            function tinkGetBytes(bs) {
+                if (!bs) return null;
+                try { if (typeof bs.toByteArray === 'function') return bs.toByteArray(); } catch(_) {}
+                try {
+                    const size = bs.size();
+                    const arr = [];
+                    for (let i = 0; i < size; i++) {
+                        let b = bs.byteAt(i);
+                        let n = (typeof b === 'object' && b.intValue) ? b.intValue() : parseInt(b, 10);
+                        if (n > 127) n -= 256;
+                        arr.push(n);
+                    }
+                    return Java.array('byte', arr);
+                } catch(_) { return null; }
+            }
+
+            const Builder = Java.use("com.google.crypto.tink.proto.Keyset$Builder");
+
+            Builder.setPrimaryKeyId.overload('int').implementation = function (id) {
+                tinkPrimaryKeyId = id;
+                return this.setPrimaryKeyId(id);
+            };
+
+            Builder.addKey.overload('com.google.crypto.tink.proto.Keyset$Key').implementation = function (key) {
+                const kd = key.getKeyData();
+                let b64 = "";
+                const bytes = tinkGetBytes(kd.getValue());
+                if (bytes) {
+                    b64 = Java.use("android.util.Base64").encodeToString(bytes, 0).trim();
+                }
+                tinkKeys.push({
+                    keyData: {
+                        typeUrl: kd.getTypeUrl(),
+                        value: b64,
+                        keyMaterialType: kd.getKeyMaterialType().toString()
+                    },
+                    status: key.getStatus().toString(),
+                    keyId: key.getKeyId(),
+                    outputPrefixType: key.getOutputPrefixType().toString()
+                });
+                return this.addKey(key);
+            };
+
+            Builder.build.overloads.forEach(overload => {
+                overload.implementation = function () {
+                    const result = overload.call(this);
+                    if (tinkKeys.length > 0) {
+                        console.log(`${yellow}[Tink] Keyset built — ${tinkKeys.length} key(s). If decryption uses AEAD, you may also need Cipher.updateAAD data.${reset}`);
+                        logObj("Tink.Keyset.Builder.build", {
+                            primaryKeyId: tinkPrimaryKeyId > 0 ? tinkPrimaryKeyId : (tinkKeys[0].keyId || 0),
+                            key: tinkKeys
+                        }, color);
+                        tinkKeys = [];
+                        tinkPrimaryKeyId = 0;
+                    }
+                    return result;
+                };
             });
         } catch(_) {}
     }
