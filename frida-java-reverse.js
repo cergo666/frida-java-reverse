@@ -980,18 +980,34 @@ Java.perform(() => {
 
             function tinkGetBytes(bs) {
                 if (!bs) return null;
-                try { if (typeof bs.toByteArray === 'function') return bs.toByteArray(); } catch(_) {}
+                try { return bs.toByteArray(); } catch(_) {}
                 try {
                     const size = bs.size();
                     const arr = [];
                     for (let i = 0; i < size; i++) {
-                        let b = bs.byteAt(i);
-                        let n = (typeof b === 'object' && b.intValue) ? b.intValue() : parseInt(b, 10);
+                        let val = bs.byteAt(i);
+                        let n = typeof val === 'number' ? val : (val.intValue ? val.intValue() : parseInt(val));
                         if (n > 127) n -= 256;
+                        else if (n < -128) n += 256;
                         arr.push(n);
                     }
                     return Java.array('byte', arr);
-                } catch(_) { return null; }
+                } catch(_) {}
+                try {
+                    const str = String(bs).match(/contents="([^"]*)"/)?.[1] || String(bs);
+                    const arr = [];
+                    for (let i = 0; i < str.length; i++) {
+                        if (str[i] === '\\') {
+                            if (/^[0-7]{3}$/.test(str.substr(i + 1, 3))) { arr.push(parseInt(str.substr(i + 1, 3), 8)); i += 3; }
+                            else if (str[i + 1] === 'x' && /^[0-9a-fA-F]{2}$/.test(str.substr(i + 2, 2))) { arr.push(parseInt(str.substr(i + 2, 2), 16)); i += 3; }
+                            else { arr.push(str.charCodeAt(i + 1)); i += 1; }
+                        } else {
+                            arr.push(str.charCodeAt(i));
+                        }
+                    }
+                    return Java.array('byte', arr);
+                } catch(_) {}
+                return null;
             }
 
             const Builder = Java.use("com.google.crypto.tink.proto.Keyset$Builder");
