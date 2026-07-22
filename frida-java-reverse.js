@@ -1025,11 +1025,13 @@ Java.perform(() => {
                 overload.implementation = function () {
                     const result = overload.call(this);
                     if (tinkKeys.length > 0) {
+                        const count = incrementCallCount("Tink.Keyset.Builder.build");
                         console.log(`${yellow}[Tink] Keyset built — ${tinkKeys.length} key(s). If decryption uses AEAD, you may also need Cipher.updateAAD data.${reset}`);
-                        logObj("Tink.Keyset.Builder.build", {
+                        console.log(`${color}[Tink.Keyset.Builder.build] #${count}${reset}`);
+                        console.log(JSON.stringify({
                             primaryKeyId: tinkPrimaryKeyId > 0 ? tinkPrimaryKeyId : (tinkKeys[0].keyId || 0),
                             key: tinkKeys
-                        }, color);
+                        }, null, 2));
                         tinkKeys = [];
                         tinkPrimaryKeyId = 0;
                     }
