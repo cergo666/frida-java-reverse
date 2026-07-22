@@ -649,7 +649,7 @@ Java.perform(() => {
             SSL.init.overloads.forEach(o => {
                 o.implementation = function () {
                     logObj("SSLContext.init", { keyManagers: arguments[0] ? arguments[0].length : 0, trustManagers: arguments[1] ? arguments[1].length : null }, color);
-                    return o.apply(this, arguments);
+                    o.apply(this, arguments);
                 };
             });
         } catch(e) { console.log(`${red}[!] SSLContext hook failed: ${e}${reset}`); }
