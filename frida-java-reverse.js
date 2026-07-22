@@ -686,7 +686,11 @@ Java.perform(() => {
                 "[Ljavax.net.ssl.KeyManager;", "[Ljavax.net.ssl.TrustManager;", "java.security.SecureRandom"
             );
             SSLContext_init.implementation = function(keyManager, trustManager, secureRandom) {
-                SSLContext_init.call(this, keyManager, TrustManagers, secureRandom);
+                try {
+                    SSLContext_init.call(this, keyManager, TrustManagers, secureRandom);
+                } catch(_) {
+                    SSLContext_init.call(this, null, TrustManagers, secureRandom);
+                }
             };
         } catch(_) {}
 
@@ -1102,11 +1106,13 @@ Java.perform(() => {
         try { Java.use("com.startapp.sdk.adsbase.StartAppSDK").showAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.StartApp.showAd", { blocked: true }, color); }; }); } catch(_) {}
         try { Java.use("com.startapp.sdk.adsbase.Ad").load.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.StartApp.Ad.load", { blocked: true }, color); }; }); } catch(_) {}
 
-        // --- Yandex Mobile Ads ---
+        // --- Yandex Mobile Ads (block at loader level) ---
         try { Java.use("com.yandex.mobile.ads.AdView").loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AdView.loadAd", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd"); YI.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Interstitial.loadAd", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd"); YR.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.Rewarded.loadAd", { blocked: true }, color); }; }); } catch(_) {}
-        try { const YO = Java.use("com.yandex.mobile.ads.appopen.AppOpenAd"); YO.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AppOpen.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        try { Java.use("com.yandex.mobile.ads.interstitial.InterstitialAdLoader").loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.InterstitialAdLoader.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        try { Java.use("com.yandex.mobile.ads.rewarded.RewardedAdLoader").loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.RewardedAdLoader.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        try { Java.use("com.yandex.mobile.ads.appopen.AppOpenAd").loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.AppOpen.loadAd", { blocked: true }, color); }; }); } catch(_) {}
+        // Hook implementation class show() as fallback
+        try { Java.use("com.yandex.mobile.ads.impl.in2").show.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.Yandex.InterstitialAd.show", { blocked: true }, color); }; }); } catch(_) {}
 
         // --- AppNext ---
         try { const ANI = Java.use("com.appnext.ads.interstitial.Interstitial"); ANI.loadAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.AppNext.Interstitial.loadAd", { blocked: true }, color); }; }); ANI.showAd.overloads.forEach(o => { o.implementation = function () { logObj("AdBlocker.AppNext.Interstitial.showAd", { blocked: true }, color); }; }); } catch(_) {}
@@ -1195,13 +1201,80 @@ Java.perform(() => {
             });
         } catch(_) {}
 
+        // ==================== MEDIATION LOGGING ====================
+        // Логируем вызовы медиации чтобы видеть какой SDK блокируется
+        try {
+            const MIA = Java.use("com.monetization.ads.mediation.interstitial.MediatedInterstitialAdapter");
+            MIA.loadInterstitial.overloads.forEach(o => {
+                o.implementation = function (ctx, listener, params, extras) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] Interstitial.loadInterstitial → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+            MIA.showInterstitial.overloads.forEach(o => {
+                o.implementation = function (activity) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] Interstitial.showInterstitial → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(e) { console.log(`${yellow}[Mediation] InterstitialAdapter hook failed: ${e}${reset}`); }
+
+        try {
+            const MRA = Java.use("com.monetization.ads.mediation.rewarded.MediatedRewardedAdapter");
+            MRA.loadRewardedAd.overloads.forEach(o => {
+                o.implementation = function (ctx, listener, params, extras) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] Rewarded.loadRewardedAd → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+            MRA.showRewardedAd.overloads.forEach(o => {
+                o.implementation = function (activity) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] Rewarded.showRewardedAd → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(e) { console.log(`${yellow}[Mediation] RewardedAdapter hook failed: ${e}${reset}`); }
+
+        try {
+            const MBA = Java.use("com.monetization.ads.mediation.banner.MediatedBannerAdapter");
+            MBA.loadBanner.overloads.forEach(o => {
+                o.implementation = function (ctx, listener, params, extras) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] Banner.loadBanner → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(e) { console.log(`${yellow}[Mediation] BannerAdapter hook failed: ${e}${reset}`); }
+
+        try {
+            const MOA = Java.use("com.monetization.ads.mediation.appopenad.MediatedAppOpenAdAdapter");
+            MOA.loadAppOpenAd.overloads.forEach(o => {
+                o.implementation = function (ctx, listener, params, extras) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] AppOpen.loadAppOpenAd → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+            MOA.showAppOpenAd.overloads.forEach(o => {
+                o.implementation = function (activity) {
+                    const sdk = this.getClass().getSimpleName();
+                    console.log(`${yellow}[Mediation] AppOpen.showAppOpenAd → ${sdk}${reset}`);
+                    return o.apply(this, arguments);
+                };
+            });
+        } catch(e) { console.log(`${yellow}[Mediation] AppOpenAdapter hook failed: ${e}${reset}`); }
+
         // ==================== AD LISTENER INTERCEPTION ====================
         const adDismissCallbacks = [];
 
-        // Yandex Mobile Ads — hook interface (Frida resolves to all implementations)
+        // Yandex Mobile Ads — hook implementation class (interface hooks don't work)
         try {
-            const YI = Java.use("com.yandex.mobile.ads.interstitial.InterstitialAd");
-            console.log(`${green}[AdBlocker] Yandex InterstitialAd class found, hooking...${reset}`);
+            const YI = Java.use("com.yandex.mobile.ads.impl.in2");
+            console.log(`${green}[AdBlocker] Yandex InterstitialAd impl found, hooking...${reset}`);
             YI.setAdEventListener.overloads.forEach(o => {
                 o.implementation = function (listener) {
                     if (listener) {
@@ -1214,9 +1287,6 @@ Java.perform(() => {
             YI.show.overloads.forEach(o => {
                 o.implementation = function (activity) {
                     console.log(`${yellow}[AdBlocker] Yandex InterstitialAd.show → blocked, firing callback${reset}`);
-                    // Не вызываем оригинальный show() — Activity не запустится,
-                    // watchdog не запустится, gate не установится
-                    // Вызываем onAdDismissed() синхронно — coroutine resume дождётся suspend
                     const fired = fireAdDismissCallbacks();
                     if (fired > 0) {
                         console.log(`${green}[AdBlocker] Yandex show blocked → fake onAdDismissed (${fired})${reset}`);
@@ -1224,7 +1294,7 @@ Java.perform(() => {
                     return;
                 };
             });
-        } catch(e) { console.log(`${yellow}[AdBlocker] Yandex InterstitialAd not available: ${e}${reset}`); }
+        } catch(_) {}
 
         try {
             const YR = Java.use("com.yandex.mobile.ads.rewarded.RewardedAd");
@@ -1370,55 +1440,6 @@ Java.perform(() => {
             });
         } catch(_) {}
         console.log(`${green}[AdBlocker] Activity-level blocking enabled${reset}`);
-            return false;
-        }
-
-        try {
-            Java.use("android.app.Activity").startActivity.overloads.forEach(o => {
-                o.implementation = function (intent) {
-                    if (blockAdActivity(intent)) return;
-                    return o.apply(this, arguments);
-                };
-            });
-        } catch(_) {}
-        try {
-            Java.use("android.app.Activity").startActivityForResult.overloads.forEach(o => {
-                o.implementation = function (intent, requestCode) {
-                    if (blockAdActivity(intent)) return;
-                    return o.apply(this, arguments);
-                };
-            });
-        } catch(_) {}
-        console.log(`${green}[AdBlocker] Activity-level blocking enabled${reset}`);
-
-        // ==================== BYPASS isNeedShowAds CHECK ====================
-        // Приложения с VPN/стримингом блокируются после показа рекламы из-за
-        // internal gate (a4/d.b). Самый надёжный способ — вернуть false на проверке.
-        try {
-            Java.use("uq.f0").g.overloads.forEach(o => {
-                o.implementation = function (continuation) {
-                    console.log(`${yellow}[AdBlocker] isNeedShowAds bypassed → false${reset}`);
-                    return Java.use("java.lang.Boolean").$new(false);
-                };
-            });
-            console.log(`${green}[AdBlocker] isNeedShowAds bypass enabled (uq.f0.g)${reset}`);
-        } catch(_) {
-            // Альтернативный путь: ищем метод по строке "isNeedShowAds"
-            try {
-                Java.enumerateLoadedClasses({
-                    onMatch: function(name) {
-                        try {
-                            const cls = Java.use(name);
-                            cls.g.overloads.forEach(o => {
-                                const src = o.toString();
-                                if (src.indexOf("uq/f0") === -1) return;
-                            });
-                        } catch(_) {}
-                    },
-                    onComplete: function() {}
-                });
-            } catch(_) {}
-        }
 
         // ==================== WEBVIEW BLOCKING ====================
         // Блокировка рекламных URL в WebView (file:// пропускаются — это локальные контроллеры SDK)
@@ -1455,7 +1476,7 @@ Java.perform(() => {
 
     // ===================== SUMMARY =====================
 
-    const enabled = Object.entries(MODULES).filter(([_, v]) => v).map(([k]) => k);
+    const enabled = Object.entries(MODULES).filter(function(entry) { return entry[1]; }).map(function(entry) { return entry[0]; });
     console.log(`${green}[+] Installed modules: ${enabled.join(", ")}${reset}`);
     console.log(`${green}[+] Ad keywords: ${AD_KEYWORDS.length} | Activity prefixes: ${AD_ACTIVITY_PREFIXES.length} | URL keywords: ${AD_URL_KEYWORDS.length}${reset}`);
     console.log(`${green}[+] PRINT_STACKTRACE: ${PRINT_STACKTRACE}${reset}`);
